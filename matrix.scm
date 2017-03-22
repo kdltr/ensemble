@@ -2,6 +2,23 @@
 
 (use clojurian-syntax)
 
+;; Helper procedures
+;; =================
+
+(define (ref keys alist)
+  (if (null? keys)
+      alist
+      (and-let* ((o (alist-ref (car keys) alist)))
+           (ref (cdr keys) o))))
+
+
+;; High level API
+;; ==============
+
+(define transaction-id (make-parameter 0))
+(define (new-txnid)
+  (transaction-id (add1 (transaction-id))))
+
 (define (password-login user password)
   (->> (login `((type . "m.login.password")
                 (user . ,user)
@@ -14,14 +31,18 @@
   (let ((old-logout logout))
     (lambda () (old-logout '()))))
 
-;; Config file
-;; ===========
 
-(define (save-config)
-  (with-output-to-file "config.scm"
-    (lambda ()
-      (for-each write `((init! ,(uri->string (server-uri)))
-                        (access-token ,(access-token)))))))
+(define (message:text room text)
+  (room-send room
+             'm.room.message
+             (new-txnid)
+             `((msgtype . "m.text")
+               (body . ,text))))
 
-(when (file-exists? "config.scm")
-  (for-each eval (read-file "config.scm")))
+(define (message:emote room text)
+  (room-send room
+             'm.room.message
+             (new-txnid)
+             `((msgtype . "m.emote")
+               (body . ,text))))
+

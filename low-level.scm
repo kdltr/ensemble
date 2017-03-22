@@ -72,8 +72,12 @@
 (define-endpoint GET (login-schemes "login"))
 (define-endpoint POST (login "login"))
 (define-endpoint POST (logout "logout"))
+
 (define-endpoint GET (sync "sync" #!key filter since timeout full_state set_presence timeout))
+
+(define-endpoint POST (room-join "rooms" room-id "join"))
 (define-endpoint PUT (room-send "rooms" room-id "send" event-type transaction-id))
+
 (define-endpoint GET (get-filter "user" user-id "filter" filter-id))
 (define-endpoint POST (create-filter "user" user-id "filter"))
 
