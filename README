@@ -1,0 +1,23 @@
+A Matrix client in CHICKEN Scheme
+=================================
+
+Only the most basic features have been implemented:
+
+- password login
+- message receiving
+- message sending
+- emotes
+
+The text user interface is very crude and has a few bugs.
+
+How to use it:
+--------------
+
+Run `csi client.scm` in this directory and use the `(init! <server>)`, `(password-login <user> <password>)` and `(startup)` procedures, like so:
+
+    (init! "https://upyum.com:8448")
+    (password-login "toto" "my-super-password")
+    (startup)
+
+
+You can quit by typing /exit at the input prompt, your session will be saved in `config.scm` and automatically loaded back next time so that you only have to run the `(startup)` procedure (or directly run `csi client.scm -e '(startup)'`).
