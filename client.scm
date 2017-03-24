@@ -26,6 +26,7 @@
                         (mupdate '(creator)
                                 (mref '(content creator) evt)
                                 ctx)))
+    ;; TODO: Take care of the `ban` membership
     (m.room.member . ,(lambda (ctx evt)
                         (let ((membership (string->symbol (mref '(content membership) evt)))
                               (who (mref '(state_key) evt))
@@ -38,7 +39,10 @@
                                   ((join)
                                    (mupdate '(members) (lset-adjoin string=? (or (mref '(members) ctx) '()) who) ctx))
                                   ((leave)
-                                   (mupdate '(members) (delete who (or (mref '(members) ctx) '())) ctx)))
+                                   (mupdate '(members) (delete who (or (mref '(members) ctx) '())) ctx))
+                                  (else
+                                    (warning "Unknown membership from m.room.member event" membership)
+                                    ctx))
                                 (if display-name
                                     (if (eq? display-name 'null)
                                         (mdelete `(member-names ,who) ctx)
