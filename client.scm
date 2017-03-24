@@ -125,9 +125,96 @@
                       rooms contexts)))
     timelines))
 
+(define (advance-timelines timelines batch)
+  (if (null? timelines)
+      '()
+      (let* ((room (car timelines))
+             (room-id (car room))
+             (timeline (cdr room))
+             (batch-timeline (mref `(rooms join ,room-id timeline events) batch)))
+        (cons (cons room-id
+                    (advance-timeline timeline
+                                      (mref '(_context) (car timeline))
+                                      (or batch-timeline #())))
+              (advance-timelines (cdr timelines) batch)))))
+
 (define (rooms-contexts tls)
   (map
     (lambda (p)
       (cons (car p)
             (mref '(_context) (cadr p))))
     tls))
+
+
+;; TUI connection
+;; ==============
+
+(load "tui")
+(use mailbox utf8-srfi-13)
+
+(define current-room (make-parameter #f))
+
+(define *timelines* '())
+
+(define ui-events (make-mailbox))
+
+(define (sync-loop batch)
+  (let ((new-batch (sync timeout: 30000 since: (mref '(next_batch) batch))))
+    (mailbox-send! ui-events (cons 'batch new-batch))
+    (sync-loop new-batch)))
+
+(define (input-loop)
+  (let ((input (parley "> ")))
+    (unless (string=? input "")
+      (mailbox-send! ui-events (cons 'input input)))
+    (input-loop)))
+
+(define (main-loop)
+  (refresh!)
+  (let* ((ui-evt (mailbox-receive! ui-events))
+         (type (car ui-evt))
+         (content (cdr ui-evt)))
+    (case type
+      ((input)
+       (handle-input content))
+      ((batch)
+       (set! *timelines* (advance-timelines *timelines* content))))
+    (main-loop)))
+
+(define commands
+  `((me . ,(lambda (args) (message:emote (current-room) (string-join args " "))))
+    (room . ,(lambda (args)
+               (if (null? args)
+                   (status-message (format #f "Current room: ~a" (current-room)))
+                   (let ((room (string->symbol (car args))))
+                     (when (alist-ref room *timelines*)
+                       (status-message (format #f "Room changed from ~a to ~a" (current-room) room))
+                       (current-room room)
+                       (refresh!))))))
+    (rooms . ,(lambda (args)
+                (status-message (format #f "Rooms joined: ~a" (map car *timelines*)))))
+    (exit . ,(lambda (args)
+               (save-config) (exit 0)))
+    ))
+
+(define (handle-command str)
+  (let* ((cmdline (string-split (string-drop str 1) " "))
+         (cmd (string->symbol (car cmdline)))
+         (args (cdr cmdline))
+         (proc (alist-ref cmd commands)))
+    (if proc
+        (proc args)
+        (status-message (format #f "Unknown command: ~a" cmd)))))
+
+(define (handle-input str)
+  (if (char=? (string-ref str 0) #\/)
+      (handle-command str)
+      (message:text (current-room) str)))
+
+(define (startup)
+  (let ((batch0 (sync)))
+    (set! *timelines* (initial-timelines batch0))
+    (current-room (caar *timelines*))
+    (thread-start! (lambda () (sync-loop batch0)))
+    (thread-start! input-loop)
+    (main-loop)))

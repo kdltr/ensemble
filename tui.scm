@@ -6,21 +6,17 @@
 (add-key-binding! #\x4 identity) ;; C-d
 (add-key-binding! #\xc identity) ;; C-l
 
-(define messages '())
+;; TODO this is absolutely wrong
+(define (take-most-events rows events)
+  (if (or (null? events) (<= rows 0))
+      '()
+      (let* ((evt (car events))
+             (str (print-event evt))
+             (lines (add1 (/ (string-length str) columns))))
+        (cons str (take-most-events (- rows lines) (cdr events))))))
 
-(define (print-message msg)
-  (let* ((sender (car msg))
-         (name-width (string-length sender))
-         (padding (string-append (make-string name-width #\space) " | "))
-         (text-width (- columns (+ name-width 3)))
-         (text (cdr msg))
-         (formated (fmt #f (wrap-lines text)))
-         (lines (butlast (string-split formated "\n" #t))))
-    (display sender)
-    (display " | ")
-    (display (car lines))
-    (newline)
-    (for-each (lambda (l) (display padding) (display l) (newline)) (cdr lines))))
+(define (print-events events)
+  (for-each print (reverse (take-most-events (- rows 3) events))))
 
 (define-values (rows columns) (terminal-size (current-output-port)))
 
@@ -29,11 +25,13 @@
     (set!-values (rows columns) (terminal-size (current-output-port)))
     (refresh!)))
 
+(define status-message (make-parameter ""))
+
 (define (refresh!)
   (display (erase-display))
   (display (cursor-position 1 1))
-  (for-each print-message (reverse messages))
+  (print-events (alist-ref (current-room) *timelines*))
   (display (cursor-position (sub1 rows) 1))
-  (display (set-text '(bg-white) (make-string columns #\space)))
+  (display (set-text '(bg-white fg-black) (string-pad-right (status-message) columns)))
   (display (cursor-position rows 1))
   (flush-output))
