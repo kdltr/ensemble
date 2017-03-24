@@ -18,7 +18,7 @@
   (for-each eval (read-file "config.scm")))
 
 
-;; Events handling
+;; Events contexts
 ;; ===============
 
 (define context-updaters
@@ -76,6 +76,7 @@
 (define (initial-context state)
   (vector-fold (lambda (i ctx evt) (update-context ctx evt)) '() state))
 
+;; Updates a timeline from a vector of events, attaching context to them
 (define (advance-timeline timeline ctx evts)
   (let loop ((ctx ctx)
              (i 0)
@@ -88,3 +89,26 @@
                 (add1 i)
                 (cons (mupdate '(_context) new-ctx evt)
                       timeline))))))
+
+
+;; Events printers
+;; ===============
+
+(define event-printers
+  `((m.room.message . ,(lambda (evt)
+                         (let* ((sender (mref '(sender) evt))
+                                (name (or (mref `(_context member-names ,sender) evt)
+                                          sender)))
+                           (format #f "<~a>: ~a" name (mref '(content body) evt)))))
+    ))
+
+
+;; Takes a contextualized event and gives a string representation of it
+(define (print-event evt)
+  (let* ((type (string->symbol (mref '(type) evt)))
+         (content (mref '(content) evt))
+         (printer (alist-ref type event-printers)))
+    (if printer
+        (printer evt)
+        (format #f "unknown event ~a: ~s" type content))))
+
