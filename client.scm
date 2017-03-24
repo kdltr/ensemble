@@ -112,3 +112,22 @@
         (printer evt)
         (format #f "unknown event ~a: ~s" type content))))
 
+
+;; Stuff
+;; =====
+
+(define (initial-timelines batch)
+  (let* ((rooms (mref '(rooms join) batch))
+         (contexts (map (o initial-context (cut mref '(state events) <>) cdr) rooms))
+         (timelines (map
+                      (lambda (p ctx) (cons (car p)
+                                            (advance-timeline '() ctx (mref '(timeline events) (cdr p)))))
+                      rooms contexts)))
+    timelines))
+
+(define (rooms-contexts tls)
+  (map
+    (lambda (p)
+      (cons (car p)
+            (mref '(_context) (cadr p))))
+    tls))
