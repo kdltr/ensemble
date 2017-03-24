@@ -10,8 +10,9 @@ Only the most basic features have been implemented:
 
 The text user interface is very crude and has a few bugs.
 
-How to use it:
---------------
+
+How to use it
+-------------
 
 Run `csi client.scm` in this directory and use the `(init! <server>)`, `(password-login <user> <password>)` and `(startup)` procedures, like so:
 
@@ -21,3 +22,12 @@ Run `csi client.scm` in this directory and use the `(init! <server>)`, `(passwor
 
 
 You can quit by typing /exit at the input prompt, your session will be saved in `config.scm` and automatically loaded back next time so that you only have to run the `(startup)` procedure (or directly run `csi client.scm -e '(startup)'`).
+
+
+Available commands
+------------------
+
+- `/me text` sends an emote
+- `/rooms` lists the rooms you are in in the status bar
+- `/room room-id` moves you to the given room
+- `/exit` saves the session to config.scm and quits
