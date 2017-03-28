@@ -103,7 +103,7 @@
                          (let* ((sender (mref '(sender) evt))
                                 (name (or (mref `(_context member-names ,sender) evt)
                                           sender)))
-                           (format #f "<~a>: ~a" name (mref '(content body) evt)))))
+                           (format #f "<~a> ~a" name (mref '(content body) evt)))))
     ))
 
 
@@ -168,21 +168,26 @@
     (sync-loop new-batch)))
 
 (define (input-loop)
-  (let ((input (parley "> ")))
-    (unless (string=? input "")
-      (mailbox-send! ui-events (cons 'input input)))
-    (input-loop)))
+  (mailbox-send! ui-events
+                 (process-input (cut cons 'char <>) (cut cons 'key <>)))
+  (input-loop))
 
 (define (main-loop)
+  (fill! central-frame #\space)
+  (draw-messages! (alist-ref (current-room) *timelines*))
   (refresh!)
   (let* ((ui-evt (mailbox-receive! ui-events))
          (type (car ui-evt))
          (content (cdr ui-evt)))
     (case type
-      ((input)
-       (handle-input content))
+      ((char)
+       (register-char content))
+      ((key)
+       (register-key content))
       ((batch)
-       (set! *timelines* (advance-timelines *timelines* content))))
+       (set! *timelines* (advance-timelines *timelines* content)))
+      (else
+        (error "unknown ui event" ui-evt)))
     (main-loop)))
 
 (define commands
@@ -211,14 +216,29 @@
         (status-message (format #f "Unknown command: ~a" cmd)))))
 
 (define (handle-input str)
-  (if (char=? (string-ref str 0) #\/)
-      (handle-command str)
-      (message:text (current-room) str)))
+  (set! *text* "")
+  (set! *cursor-pos* 0)
+  (refresh-input-bar!)
+  (unless (equal? str "")
+    (if (char=? (string-ref str 0) #\/)
+        (handle-command str)
+        (message:text (current-room) str))))
 
 (define (startup)
   (let ((batch0 (sync)))
     (set! *timelines* (initial-timelines batch0))
-    (current-room (caar *timelines*))
+    (current-room '!exsFQQeKuTTCSqhMVj:elynx.fr)
     (thread-start! (lambda () (sync-loop batch0)))
-    (thread-start! input-loop)
+    (thread-start! (make-thread input-loop))
     (main-loop)))
+
+#|
+(use trace)
+(trace startup)
+(trace main-loop)
+(trace input-loop)
+(trace process-input)
+(trace handle-input)
+(trace mailbox-send!)
+(trace mailbox-receive!)
+|#
