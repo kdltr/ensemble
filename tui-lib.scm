@@ -59,7 +59,7 @@
                   (cell-index src 0 i)
                   (cell-index src (grid-width src) i))))
 
-(define (gprint! grid col row str #!key (attrs '()) (fg #f) (bg #f))
+(define (grid-put-string! grid col row str #!key (attrs '()) (fg #f) (bg #f))
   (let loop ((i 0))
     (unless (= i (min (string-length str)
                       (* (grid-width grid) (grid-height grid))))
@@ -69,6 +69,15 @@
                       (string-ref str i)
                       attrs: attrs fg: fg bg: bg)
       (loop (add1 i)))))
+
+(define (gprint! grid col row str #!key (attrs '()) (fg #f) (bg #f))
+  (cond ((null? str)
+         'done)
+        ((string? str)
+         (gprint! grid col row (string-split str "\n" #t) attrs: attrs fg: fg bg: bg))
+        ((pair? str)
+         (grid-put-string! grid col row (car str) attrs: attrs fg: fg bg: bg)
+         (gprint! grid col (add1 row) (cdr str) attrs: attrs fg: fg bg: bg))))
 
 (define (color->ansi-attribute ground color)
   (unless (member ground '(fg bg))

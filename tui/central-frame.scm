@@ -10,7 +10,10 @@
 (gprint! central-frame 0 0 "central frame" fg: 'black bg: 'white)
 
 (define (new-message text)
-  (let* ((height (add1 (quotient (string-length text) (add1 (grid-width central-frame)))))
+  (let* ((lines (string-split text "\n" #t))
+         (height (+ (length lines)
+                    (fold + 0 (map (lambda (s) (quotient (string-length s) (add1 (grid-width central-frame))))
+                                   lines))))
          (grid (make-grid (grid-width central-frame) height)))
     (gprint! grid 0 0 text)
     grid))
