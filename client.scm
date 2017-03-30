@@ -1,3 +1,5 @@
+(use vector-lib clojurian-syntax uri-common)
+
 (load "matrix")
  
 ;; Config file
@@ -227,18 +229,7 @@
 (define (startup)
   (let ((batch0 (sync)))
     (set! *timelines* (initial-timelines batch0))
-    (current-room '!exsFQQeKuTTCSqhMVj:elynx.fr)
+    (current-room (caar *timelines*))
     (thread-start! (lambda () (sync-loop batch0)))
     (thread-start! (make-thread input-loop))
     (main-loop)))
-
-#|
-(use trace)
-(trace startup)
-(trace main-loop)
-(trace input-loop)
-(trace process-input)
-(trace handle-input)
-(trace mailbox-send!)
-(trace mailbox-receive!)
-|#
