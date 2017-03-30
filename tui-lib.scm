@@ -1,7 +1,7 @@
 ;; TUI library
 ;; ===========
 
-(use vector-lib ansi-escape-sequences miscmacros)
+(use utf8 vector-lib ansi-escape-sequences miscmacros)
 
 ;; TODO more compact representation for grids
 (define-record cell attrs fg bg char)
@@ -11,6 +11,12 @@
 (define +valid-colors+ '(black red green yellow blue magenta cyan white))
 
 (define empty-cell (make-cell '() #f #f #\space))
+
+(define (cell=? c1 c2)
+  (and (char=? (cell-char c1) (cell-char c2))
+       (eq? (cell-fg c1) (cell-fg c2))
+       (eq? (cell-bg c2) (cell-bg c2))
+       (lset= eqv? (cell-attrs c1) (cell-attrs c2))))
 
 (define %make-grid make-grid)
 (define (make-grid width height)
@@ -71,18 +77,47 @@
     (error 'color->ansi-attribute "invalid color" color))
   (symbol-append ground '- color))
 
+(define *current-attrs* '(reset))
+
 (define (draw-cell! cell)
-  (write-string (set-text (append '(reset)
-                                  (if (cell-fg cell)
-                                      (list (color->ansi-attribute 'fg (cell-fg cell)))
-                                      '())
-                                  (if (cell-bg cell)
-                                      (list (color->ansi-attribute 'bg (cell-bg cell)))
-                                      '())
-                                  (cell-attrs cell))
-                          (string (cell-char cell)))))
+  (let ((attrs (append '(reset)
+                       (if (cell-fg cell)
+                           (list (color->ansi-attribute 'fg (cell-fg cell)))
+                           '())
+                       (if (cell-bg cell)
+                           (list (color->ansi-attribute 'bg (cell-bg cell)))
+                           '())
+                       (cell-attrs cell))))
+    (write-string (if (lset= eqv? attrs *current-attrs*)
+                      (string (cell-char cell))
+                      (begin
+                        (set! *current-attrs* attrs)
+                        (set-text attrs (string (cell-char cell)) #f))))))
+
+(define *previous-grid* (make-grid 0 0))
 
 (define (draw-grid! grid)
+  (if (and (= (grid-width grid) (grid-width *previous-grid*))
+           (= (grid-height grid) (grid-height *previous-grid*)))
+      (draw-diff-grid! *previous-grid* grid 0 #f)
+      (draw-whole-grid! grid))
+  (set! *previous-grid* (object-copy grid)))
+
+(define (draw-whole-grid! grid)
   (write-string (cursor-position 1 1))
   (vector-for-each (lambda (i cell) (draw-cell! cell))
                    (grid-cells grid)))
+
+(define (draw-diff-grid! from to index cursor-behind)
+  (unless (= index (vector-length (grid-cells from)))
+    (let* ((x (modulo index (grid-width from)))
+           (y (quotient index (grid-width from)))
+           (fc (grid-ref from x y))
+           (tc (grid-ref to x y)))
+      (if (cell=? fc tc)
+          (draw-diff-grid! from to (add1 index) #f)
+          (begin
+            (unless cursor-behind
+              (write-string (cursor-position (add1 y) (add1 x))))
+            (draw-cell! tc)
+            (draw-diff-grid! from to (add1 index) #t))))))
