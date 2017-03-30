@@ -1,3 +1,5 @@
+(use stty)
+
 (stty termin '((not echo)
                (not isig)
                (not icanon)
@@ -44,11 +46,11 @@
 (define *cursor-pos* 0)
 
 ;; INPUT bar
-(define input-bar (make-grid columns 1))
+(define input-bar-grid (make-grid columns 1))
 
 (define (refresh-input-bar!)
-  (fill! input-bar #\space)
-  (gprint! input-bar 0 0 *text*))
+  (fill! input-bar-grid #\space)
+  (gprint! input-bar-grid 0 0 *text*))
 
 
 ;; Procedures for key bindings

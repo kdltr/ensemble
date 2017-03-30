@@ -26,10 +26,10 @@
 (load "tui/central-frame")
 
 (define (blit-all!)
-  (blit! buffer 0 0 title-bar)
+  (blit! buffer 0 0 title-bar-grid)
   (blit! buffer 0 1 central-frame)
-  (blit! buffer 0 (- rows 2) status-bar)
-  (blit! buffer 0 (sub1 rows) input-bar))
+  (blit! buffer 0 (- rows 2) status-bar-grid)
+  (blit! buffer 0 (sub1 rows) input-bar-grid))
 
 (define (refresh!)
   (blit-all!)

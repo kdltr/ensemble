@@ -1,9 +1,9 @@
 ;; CENTRAL FRAME
 
 (define messages-height (- (grid-height buffer)
-                           (grid-height title-bar)
-                           (grid-height status-bar)
-                           (grid-height input-bar)))
+                           (grid-height title-bar-grid)
+                           (grid-height status-bar-grid)
+                           (grid-height input-bar-grid)))
 
 (define central-frame (make-grid columns messages-height))
 (fill! central-frame #\space bg: 'white)
