@@ -34,7 +34,9 @@
 (define (new-txnid)
   (transaction-id (add1 (transaction-id))))
 
+(define account-name (make-parameter #f))
 (define (password-login user password)
+  (account-name user)
   (->> (login `((type . "m.login.password")
                 (user . ,user)
                 (password . ,password)))

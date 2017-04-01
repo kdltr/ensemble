@@ -1,6 +1,11 @@
 (use vector-lib clojurian-syntax uri-common)
 
 (load "matrix")
+
+(define sync-filter (make-parameter #f))
+
+(define (mxid)
+  (string-append "@" (account-name) ":" (uri-host (server-uri))))
  
 ;; Config file
 ;; ===========
@@ -14,7 +19,9 @@
     (lambda ()
       (for-each write `((init! ,(uri->string (server-uri)))
                         (access-token ,(access-token))
-                        (transaction-id ,(transaction-id)))))))
+                        (transaction-id ,(transaction-id))
+                        (account-name ,(account-name))
+                        (sync-filter ,(sync-filter)))))))
 
 (when (file-exists? "config.scm")
   (for-each eval (read-file "config.scm")))
@@ -231,10 +238,19 @@
           (current-room room-id))
         (status-bar "Unable to switch to room ~a: unknown room" room-id))))
 
+(define declutter-filter
+  '((room (ephemeral (types . #())))
+    (presence (types . #()))))
+
+(define (create-declutter-filter)
+  (mref '(filter_id) (create-filter (mxid) declutter-filter)))
+
 (define (startup)
   (let ((batch0 (sync)))
     (set! *timelines* (initial-timelines batch0))
     (switch-room (caar *timelines*))
+    (unless (sync-filter)
+      (sync-filter (create-declutter-filter)))
     (thread-start! (lambda () (sync-loop batch0)))
     (thread-start! (make-thread input-loop))
     (main-loop)))
