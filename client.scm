@@ -1,6 +1,17 @@
-(use vector-lib clojurian-syntax uri-common)
+(use vector-lib clojurian-syntax uri-common openssl)
 
 (load "matrix")
+
+;; Enable server certificate validation for https URIs.
+(define ((make-ssl-server-connector ctx) uri proxy)
+  (let ((remote-end (or proxy uri)))
+    (if (eq? 'https (uri-scheme remote-end))
+        (ssl-connect (uri-host remote-end)
+                     (uri-port remote-end)
+                     ctx)
+        (default-server-connector uri proxy))))
+(http:server-connector (make-ssl-server-connector (ssl-make-client-context*)))
+
 
 (define sync-filter (make-parameter #f))
 
