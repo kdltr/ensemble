@@ -213,9 +213,12 @@
 (define commands
   `((me . ,(lambda (args) (message:emote (current-room) (string-join args " "))))
     (room . ,(lambda (args)
-               (if (null? args)
-                   (status-bar (format #f "Current room: ~a" (current-room)))
-                   (switch-room (string->symbol (car args))))))
+               (cond ((null? args)
+                      (status-bar (format #f "Current room: ~a" (current-room))))
+                     ((char=? #\! (string-ref (car args) 0))
+                      (switch-room (string->symbol (car args))))
+                     (else
+                       (find-room (string-concatenate args))))))
     (rooms . ,(lambda (args)
                 (status-message (format #f "Rooms joined: ~a" (map car *timelines*)))))
     (exit . ,(lambda (args)
@@ -248,6 +251,19 @@
           (title-bar "Room: ~a" (or room-name room-id))
           (current-room room-id))
         (status-bar "Unable to switch to room ~a: unknown room" room-id))))
+
+(define (find-room regex)
+  (define (searched-string ctx)
+    (or (mref '(name) ctx)
+        (string-concatenate
+         (map cdr (alist-delete (mxid) (mref '(member-names) ctx) string=?)))
+        ""))
+  (cond
+    ((find (lambda (room) (irregex-search regex (searched-string (mref '(_context) (cadr room)))))
+           *timelines*)
+     => (o switch-room car))
+    (else
+      (status-bar "No room matching: ~a" regex))))
 
 (define declutter-filter
   '((room (ephemeral (types . #())))
