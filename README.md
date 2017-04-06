@@ -16,9 +16,13 @@ If you want to support this project, consider donating [on liberapay](https://li
 How to use it
 -------------
 
-Run `csi client.scm` in this directory and use the `(init! <server>)`, `(password-login <user> <password>)` and `(startup)` procedures, like so:
+You have to start a new terminal that will be used by the client for its interface. I usually run `tty; sleep 9999999` in it so that I get the path to its pty and to make it ignore any input.
 
-    (init! "https://upyum.com:8448")
+You then have to define the TTY environment variable in the shell you want to run the client, like so `export TTY=/dev/pts/N`, where N is the pty of the new terminal you opened.
+
+At last, run `csi client.scm` in this directory and use the `(init! <server>)`, `(password-login <user> <password>)` and `(startup)` procedures, like so:
+
+    (init! "https://upyum.com")
     (password-login "toto" "my-super-password")
     (startup)
 
