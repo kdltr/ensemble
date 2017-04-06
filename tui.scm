@@ -12,18 +12,10 @@
 (unless (terminal-port? termout)
   (error "specified file is not a terminal" tty))
 
-(define-values (rows columns) (terminal-size termout))
-
 (set-buffering-mode! termin #:none)
 (set-buffering-mode! termout #:full 4096)
 
-;; WHOLE TERMINAL
-(define buffer (make-grid columns rows))
-
-(load "tui/input")
-(load "tui/title")
-(load "tui/status")
-(load "tui/central-frame")
+(load "tui/init")
 
 (define (blit-all!)
   (blit! buffer 0 0 title-bar-grid)
@@ -61,6 +53,8 @@
     (#\newline (handle-input *text*)
                (set! *text* "")
                (set! *cursor-pos* 0))
+    (#\page  (load "tui/init")
+             (set! *previous-grid* (make-grid 0 0)))
     (else  (format #t "unknown key: ~s~%" key))))
 
 (define status-message void)
