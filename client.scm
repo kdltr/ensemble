@@ -218,7 +218,7 @@
                      ((char=? #\! (string-ref (car args) 0))
                       (switch-room (string->symbol (car args))))
                      (else
-                       (find-room (string-concatenate args))))))
+                       (find-room (string-join args))))))
     (rooms . ,(lambda (args)
                 (status-message (format #f "Rooms joined: ~a" (map car *timelines*)))))
     (exit . ,(lambda (args)
@@ -259,7 +259,7 @@
          (map cdr (alist-delete (mxid) (mref '(member-names) ctx) string=?)))
         ""))
   (cond
-    ((find (lambda (room) (irregex-search regex (searched-string (mref '(_context) (cadr room)))))
+    ((find (lambda (room) (irregex-search (irregex regex 'i) (searched-string (mref '(_context) (cadr room)))))
            *timelines*)
      => (o switch-room car))
     (else
