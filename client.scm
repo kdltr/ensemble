@@ -9,7 +9,7 @@
         (ssl-connect (uri-host remote-end)
                      (uri-port remote-end)
                      ctx)
-        (default-server-connector uri proxy))))
+        (http:default-server-connector uri proxy))))
 (http:server-connector (make-ssl-server-connector (ssl-make-client-context*)))
 
 
