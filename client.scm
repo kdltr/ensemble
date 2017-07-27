@@ -174,31 +174,32 @@
 ;; ==============
 
 (load "tui")
-(use mailbox utf8-srfi-13)
+(use gochan utf8-srfi-13)
 
 (define current-room (make-parameter #f))
 
 (define *timelines* '())
 
-(define ui-events (make-mailbox))
+(define ui-events (gochan 0))
 
 (define (sync-loop batch)
   (let ((new-batch (sync timeout: 30000 since: (mref '(next_batch) batch))))
-    (mailbox-send! ui-events (cons 'batch new-batch))
+    (gochan-send ui-events (cons 'batch new-batch))
     (sync-loop new-batch)))
 
 (define (input-loop)
-  (mailbox-send! ui-events
-                 (process-input (cut cons 'char <>) (cut cons 'key <>)))
+  (gochan-send ui-events
+               (process-input (cut cons 'char <>) (cut cons 'key <>)))
   (input-loop))
 
 (define (main-loop)
   (fill! central-frame #\space)
   (draw-messages! (alist-ref (current-room) *timelines*))
   (refresh!)
-  (let* ((ui-evt (mailbox-receive! ui-events))
+  (let* ((ui-evt (gochan-recv ui-events))
          (type (car ui-evt))
          (content (cdr ui-evt)))
+    (print "Event received: " type)
     (case type
       ((char)
        (register-char content))
@@ -276,7 +277,7 @@
   (let ((batch0 (sync)))
     (set! *timelines* (initial-timelines batch0))
     (switch-room (caar *timelines*))
-    (unless (sync-filter)
+    #;(unless (sync-filter)
       (sync-filter (create-declutter-filter)))
     (thread-start! (lambda () (sync-loop batch0)))
     (thread-start! (make-thread input-loop))
