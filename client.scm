@@ -1,6 +1,14 @@
-(use vector-lib clojurian-syntax uri-common openssl)
+;; Make ncurses wait less time when receiving an ESC character
+(setenv "ESCDELAY" "20")
+;; Make ncurses behave correctly with utf-8
+(include "locale.scm")
 
-(load "matrix")
+(include "matrix.scm")
+
+(cond-expand
+      (debug (define (info fmt . args)
+               (apply fprintf (current-error-port) fmt args)))
+      (else (define info void)))
 
 ;; Enable server certificate validation for https URIs.
 (define ((make-ssl-server-connector ctx) uri proxy)
@@ -30,12 +38,8 @@
     (lambda ()
       (for-each write `((init! ,(uri->string (server-uri)))
                         (access-token ,(access-token))
-                        (transaction-id ,(transaction-id))
                         (account-name ,(account-name))
                         (sync-filter ,(sync-filter)))))))
-
-(when (file-exists? "config.scm")
-  (for-each eval (read-file "config.scm")))
 
 
 ;; Events contexts
@@ -94,7 +98,7 @@
     (if updater
         (updater ctx evt)
         (begin 
-          (warning "Event of unknown type" evt-type)
+          (warning "No context updater for event" evt-type)
           ctx))))
 
 (define (initial-context state)
@@ -118,23 +122,44 @@
 ;; Events printers
 ;; ===============
 
+(define (mxc->url mxc)
+  (let ((mxc-uri (uri-reference mxc)))
+    (if (eq? (uri-scheme mxc-uri) 'mxc)
+        (uri->string
+          (update-uri (server-uri)
+                      path: `(/ "_matrix" "media" "r0" "download" 
+                                ,(uri-host mxc-uri) ,(cadr (uri-path mxc-uri)))))
+        "[invalid uri]")))
+
+
+(define (m.room.message-printer evt ctx)
+  (let* ((sender (mref '(sender) evt))
+         (name (or (mref `(member-names ,sender) ctx)
+                   sender))
+         (type (mref '(content msgtype) evt))
+         (body (mref '(content body) evt)))
+    (if body
+        (case (string->symbol type)
+          ((m.emote) (sprintf "* ~a ~a" name body))
+          ((m.image m.file m.video m.audio)
+           (sprintf "*** ~a uploaded ~a: ~a" name body (mxc->url (mref '(content url) evt))))
+          (else (sprintf "<~a> ~a" name body)))
+        (sprintf "<~a> [redacted]" name))
+        ))
+
 (define event-printers
-  `((m.room.message . ,(lambda (evt)
-                         (let* ((sender (mref '(sender) evt))
-                                (name (or (mref `(_context member-names ,sender) evt)
-                                          sender)))
-                           (format #f "<~a> ~a" name (mref '(content body) evt)))))
+  `((m.room.message . ,m.room.message-printer)
     ))
 
 
 ;; Takes a contextualized event and gives a string representation of it
-(define (print-event evt)
+(define (print-event evt ctx)
   (let* ((type (string->symbol (mref '(type) evt)))
          (content (mref '(content) evt))
          (printer (alist-ref type event-printers)))
     (if printer
-        (printer evt)
-        (format #f "unknown event ~a: ~s" type content))))
+        (printer evt ctx)
+        (sprintf "No event printer for ~a: ~s" type content))))
 
 
 ;; Stuff
@@ -169,116 +194,38 @@
             (mref '(_context) (cadr p))))
     tls))
 
+;; When debugging, use a different terminal
+#|
+(define ttyname (get-environment-variable "TTY"))
+(unless ttyname
+  (error "Please define the TTY environment variable"))
+(define tty-fileno (newterm ttyname)))
+|#
 
-;; TUI connection
-;; ==============
 
-(load "tui")
-(use gochan utf8-srfi-13)
+(define tty-fileno 0)
+(define rows)
+(define cols)
+(define inputwin)
+(define statuswin)
+
+(define (start-interface)
+  (initscr)
+  (refresh)
+  (noecho)
+  (cbreak)
+  (start_color)
+  (set!-values (rows cols) (getmaxyx (stdscr)))
+
+  (set! inputwin (newwin 1 cols (- rows 1) 0))
+  (keypad inputwin #t)
+  (set! statuswin (newwin 1 cols (- rows 2) 0)))
 
 (define current-room (make-parameter #f))
 
-(define *timelines* '())
+(define ui-chan (gochan 0))
 
-(define ui-events (gochan 0))
+(define-record room window context)
+(define *rooms* '())
 
-(define (sync-loop batch)
-  (let ((new-batch (sync timeout: 30000 since: (mref '(next_batch) batch))))
-    (gochan-send ui-events (cons 'batch new-batch))
-    (sync-loop new-batch)))
-
-(define (input-loop)
-  (gochan-send ui-events
-               (process-input (cut cons 'char <>) (cut cons 'key <>)))
-  (input-loop))
-
-(define (main-loop)
-  (fill! central-frame #\space)
-  (draw-messages! (alist-ref (current-room) *timelines*))
-  (refresh!)
-  (let* ((ui-evt (gochan-recv ui-events))
-         (type (car ui-evt))
-         (content (cdr ui-evt)))
-    (print "Event received: " type)
-    (case type
-      ((char)
-       (register-char content))
-      ((key)
-       (register-key content))
-      ((batch)
-       (set! *timelines* (advance-timelines *timelines* content)))
-      (else
-        (error "unknown ui event" ui-evt)))
-    (main-loop)))
-
-(define commands
-  `((me . ,(lambda (args) (message:emote (current-room) (string-join args " "))))
-    (room . ,(lambda (args)
-               (cond ((null? args)
-                      (status-bar (format #f "Current room: ~a" (current-room))))
-                     ((char=? #\! (string-ref (car args) 0))
-                      (switch-room (string->symbol (car args))))
-                     (else
-                       (find-room (string-join args))))))
-    (rooms . ,(lambda (args)
-                (status-message (format #f "Rooms joined: ~a" (map car *timelines*)))))
-    (exit . ,(lambda (args)
-               (save-config) (exit 0)))
-    ))
-
-(define (handle-command str)
-  (let* ((cmdline (string-split (string-drop str 1) " "))
-         (cmd (string->symbol (car cmdline)))
-         (args (cdr cmdline))
-         (proc (alist-ref cmd commands)))
-    (if proc
-        (proc args)
-        (status-message (format #f "Unknown command: ~a" cmd)))))
-
-(define (handle-input str)
-  (set! *text* "")
-  (set! *cursor-pos* 0)
-  (refresh-input-bar!)
-  (unless (equal? str "")
-    (if (char=? (string-ref str 0) #\/)
-        (handle-command str)
-        (message:text (current-room) str))))
-
-(define (switch-room room-id)
-  (let ((room (alist-ref room-id *timelines*)))
-    (if room
-        (let* ((context (mref '(_context) (car room)))
-               (room-name (alist-ref 'name context)))
-          (title-bar "Room: ~a" (or room-name room-id))
-          (current-room room-id))
-        (status-bar "Unable to switch to room ~a: unknown room" room-id))))
-
-(define (find-room regex)
-  (define (searched-string ctx)
-    (or (mref '(name) ctx)
-        (string-concatenate
-         (map cdr (alist-delete (mxid) (mref '(member-names) ctx) string=?)))
-        ""))
-  (cond
-    ((find (lambda (room) (irregex-search (irregex regex 'i) (searched-string (mref '(_context) (cadr room)))))
-           *timelines*)
-     => (o switch-room car))
-    (else
-      (status-bar "No room matching: ~a" regex))))
-
-(define declutter-filter
-  '((room (ephemeral (types . #())))
-    (presence (types . #()))))
-
-(define (create-declutter-filter)
-  (mref '(filter_id) (create-filter (mxid) declutter-filter)))
-
-(define (startup)
-  (let ((batch0 (sync)))
-    (set! *timelines* (initial-timelines batch0))
-    (switch-room (caar *timelines*))
-    #;(unless (sync-filter)
-      (sync-filter (create-declutter-filter)))
-    (thread-start! (lambda () (sync-loop batch0)))
-    (thread-start! (make-thread input-loop))
-    (main-loop)))
+(include "tui.scm")

@@ -2,10 +2,10 @@
  
 (import scheme chicken)
 (use intarweb uri-common openssl (prefix http-client http:) rest-bind medea vector-lib)
-(use describe trace)
 
 (cond-expand
-      (debug (trace read-json json->string))
+      (debug (use describe trace)
+             (trace read-json json->string))
       (else))
 
 ;; Chaque requête :

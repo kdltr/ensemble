@@ -1,4 +1,4 @@
-(load "low-level")
+(include "low-level.scm")
 
 (use clojurian-syntax)
 
@@ -30,9 +30,11 @@
 ;; High level API
 ;; ==============
 
-(define transaction-id (make-parameter 0))
-(define (new-txnid)
-  (transaction-id (add1 (transaction-id))))
+(define new-txnid
+  (let ((cnt 0))
+    (lambda ()
+      (set! cnt (add1 cnt))
+      (sprintf "~a-~a" (current-seconds) cnt))))
 
 (define account-name (make-parameter #f))
 (define (password-login user password)
