@@ -1,14 +1,16 @@
 ;; Make ncurses wait less time when receiving an ESC character
 (setenv "ESCDELAY" "20")
-;; Make ncurses behave correctly with utf-8
-(include "locale.scm")
-
-(include "matrix.scm")
 
 (cond-expand
-      (debug (define (info fmt . args)
-               (apply fprintf (current-error-port) fmt args)))
-      (else (define info void)))
+      (csi (define (info fmt . args)
+               (apply fprintf (current-error-port) fmt args))
+           (load "locale.so"))
+      (else (define-syntax info
+              (syntax-rules ()
+                ((info . rest) (void))))
+            (include "locale.scm")))
+
+(include "matrix.scm")
 
 ;; Enable server certificate validation for https URIs.
 (define ((make-ssl-server-connector ctx) uri proxy)
@@ -193,14 +195,6 @@
       (cons (car p)
             (mref '(_context) (cadr p))))
     tls))
-
-;; When debugging, use a different terminal
-#|
-(define ttyname (get-environment-variable "TTY"))
-(unless ttyname
-  (error "Please define the TTY environment variable"))
-(define tty-fileno (newterm ttyname)))
-|#
 
 
 (define tty-fileno 0)

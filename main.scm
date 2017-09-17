@@ -21,7 +21,7 @@
 (import scheme (except chicken reset) extras client-mod)
 
 (cond-expand
-      (debug (enable-warnings #t))
+      (csi (enable-warnings #t))
       (else (enable-warnings #f)))
 
 (define (conceal) (display "\x1b[8m") (flush-output))
