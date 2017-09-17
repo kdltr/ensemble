@@ -20,7 +20,9 @@
                      (uri-port remote-end)
                      ctx)
         (http:default-server-connector uri proxy))))
-(http:server-connector (make-ssl-server-connector (ssl-make-client-context*)))
+(http:server-connector
+  (make-ssl-server-connector
+    (ssl-make-client-context* verify?: (not (member "--no-ssl-verify" (command-line-arguments))))))
 
 
 (define sync-filter (make-parameter #f))
