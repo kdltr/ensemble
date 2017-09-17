@@ -105,7 +105,7 @@
   (unless (equal? input-string "")
     (if (char=? (string-ref input-string 0) #\/)
         (handle-command input-string)
-        (message:text (current-room) input-string))
+        (defer 'message message:text (current-room) input-string))
     (set! input-string "")
     (move-cursor 'left)))
 
@@ -141,7 +141,7 @@
           (switch-room (find-room (string-join args))))))
 
 (define-command me args
-  (message:emote (current-room) (string-join args " ")))
+  (defer 'message message:emote (current-room) (string-join args " ")))
 
 (define-command exit args
   (save-config)
