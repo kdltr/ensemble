@@ -58,11 +58,11 @@
                    (string c)
                    (substring input-string cursor-pos))))
 
-(define (buffer-remove!)
-  (unless (= cursor-pos 0)
+(define (buffer-remove! pos)
+  (unless (or (< pos 0) (>= pos (string-length input-string)))
     (set! input-string
-      (string-append (substring input-string 0 (sub1 cursor-pos))
-                     (substring input-string cursor-pos)))))
+      (string-append (substring input-string 0 pos)
+                     (substring input-string (add1 pos))))))
 
 (define (buffer-kill!)
   (set! input-string
@@ -81,24 +81,32 @@
   (and-let* ((proc (alist-ref k keys))) (proc)))
 
 (define keys '())
-(define-syntax define-key (syntax-rules () ((_ k . body) (push! (cons k (lambda () . body)) keys))))
+(define-syntax define-key
+  (syntax-rules ()
+    ((_ (k ...) . body) (let ((proc (lambda () . body)))
+                           (push! (cons k proc) keys)
+                           ...))
+    ((_ k . body) (define-key (k) . body))))
 
 (define-key KEY_BACKSPACE
-  (buffer-remove!)
+  (buffer-remove! (sub1 cursor-pos))
   (move-cursor -1))
 
 (define-key KEY_RESIZE
   (set!-values (rows cols) (getmaxyx (stdscr)))
   (for-each redrawwin (list statuswin inputwin (room-window (alist-ref (current-room) *rooms*)))))
 
-(define-key KEY_LEFT
+(define-key (KEY_LEFT #\x02) ;; C-b
   (move-cursor -1))
 
-(define-key KEY_RIGHT
+(define-key (KEY_RIGHT #\x06) ;; C-f
   (move-cursor 1))
 
 (define-key #\x01 ;; C-a
   (move-cursor 'left))
+
+(define-key #\x04 ;; C-d
+  (buffer-remove! cursor-pos))
 
 (define-key #\x05 ;; C-e
   (move-cursor 'right))
@@ -132,8 +140,8 @@
 (define-syntax define-command
   (syntax-rules ()
     ((_ (sym ...) arg . body) (let ((proc (lambda (arg) . body)))
-                            (push! (cons 'sym proc) commands)
-                            ...))
+                                (push! (cons 'sym proc) commands)
+                                ...))
     ((_ sym arg . body) (define-command (sym) arg . body))))
 
 
