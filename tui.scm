@@ -64,7 +64,7 @@
     (receive (who datum) (thread-join! th)
       (case who
         ((sync) (make-sync-thread (handle-sync datum)))
-        ((input) (register-input datum) (make-input-thread))
+        ((input) (handle-input datum) (make-input-thread))
          ))
       )
   (main-loop)
