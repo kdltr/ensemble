@@ -54,8 +54,8 @@
   (let ((first-batch (sync)))
     (initialize-rooms! first-batch)
     (switch-room (caar *rooms*))
-    (make-sync-thread (handle-sync first-batch))
-    (make-input-thread)
+    (defer 'sync sync timeout: 30000 since: (handle-sync first-batch))
+    (defer 'input get-input)
     (main-loop)))
 
 (define (main-loop)
@@ -63,8 +63,8 @@
   (let ((th (gochan-recv ui-chan)))
     (receive (who datum) (thread-join! th)
       (case who
-        ((sync) (make-sync-thread (handle-sync datum)))
-        ((input) (handle-input datum) (make-input-thread))
+        ((sync) (defer 'sync sync timeout: 30000 since: (handle-sync datum)))
+        ((input) (handle-input datum) (defer 'input get-input))
          ))
       )
   (main-loop)
@@ -76,23 +76,19 @@
   (for-each advance-room (mref '(rooms join) batch))
   (mref '(next_batch) batch))
 
-(define (make-sync-thread since)
-    (thread-start! (make-thread (lambda ()
-                                  (handle-exceptions exn
-                                    (begin
-                                      (gochan-send ui-chan (current-thread))
-                                      (signal (list 'sync exn)))
-                                    (let ((new-batch (sync timeout: 30000 since: since)))
-                                      (gochan-send ui-chan (current-thread))
-                                      (values 'sync new-batch))))
-                   )))
-
-(define (make-input-thread)
+(define (defer id proc . args)
   (thread-start! (lambda ()
-                   (thread-wait-for-i/o! tty-fileno #:input)
-                   (gochan-send ui-chan (current-thread))
-                   (values 'input (wget_wch inputwin)))
-                 ))
+                   (let ((res (handle-exceptions exn exn (apply proc args))))
+                     (gochan-send ui-chan (current-thread))
+                     (if (condition? res)
+                         (signal (list id res))
+                         (values id res))))))
+
+(define (get-input)
+  (thread-wait-for-i/o! tty-fileno #:input)
+  (wget_wch inputwin))
+
+
 
 (define (advance-room room-data)
   (let* ((room-id (car room-data))
