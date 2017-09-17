@@ -66,7 +66,6 @@
   (buffer-insert! c)
   (move-cursor))
 
-(trace substring cursor-position)
 
 
 ;; Key bindings
