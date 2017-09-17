@@ -58,6 +58,12 @@
                    (string c)
                    (substring input-string cursor-pos))))
 
+(define (buffer-remove!)
+  (unless (= cursor-pos 0)
+    (set! input-string
+      (string-append (substring input-string 0 (sub1 cursor-pos))
+                     (substring input-string cursor-pos)))))
+
 (define (buffer-kill!)
   (set! input-string
     (substring input-string 0 cursor-pos)))
@@ -78,9 +84,8 @@
 (define-syntax define-key (syntax-rules () ((_ k . body) (push! (cons k (lambda () . body)) keys))))
 
 (define-key KEY_BACKSPACE
-  (unless (string=? input-string "")
-    (set! input-string (substring input-string 0 (sub1 (string-length input-string))))
-    (move-cursor -1)))
+  (buffer-remove!)
+  (move-cursor -1))
 
 (define-key KEY_RESIZE
   (set!-values (rows cols) (getmaxyx (stdscr)))
