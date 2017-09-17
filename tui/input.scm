@@ -13,8 +13,7 @@
 (define (refresh-inputwin)
   (wclear inputwin)
   (wprintw inputwin "~A" (buffer-window))
-  (wmove inputwin 0 (cursor-position))
-  (wrefresh inputwin))
+  (wmove inputwin 0 (cursor-position)))
 
 
 
@@ -93,8 +92,7 @@
   (move-cursor -1))
 
 (define-key KEY_RESIZE
-  (set!-values (rows cols) (getmaxyx (stdscr)))
-  (for-each redrawwin (list statuswin inputwin (room-window (alist-ref (current-room) *rooms*)))))
+  (set!-values (rows cols) (getmaxyx (stdscr))))
 
 (define-key (KEY_LEFT #\x02) ;; C-b
   (move-cursor -1))

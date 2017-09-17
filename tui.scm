@@ -14,7 +14,7 @@
                                                             room-id))
                                          (sub1 cols) #\space))
           (redrawwin (room-window room))
-          (show-win (room-window room)))
+          )
         #f)))
 
 (define (find-room regex)
@@ -59,6 +59,10 @@
     (main-loop)))
 
 (define (main-loop)
+  (wnoutrefresh (room-window (alist-ref (current-room) *rooms*)))
+  (wnoutrefresh statuswin)
+  (wnoutrefresh inputwin)
+  (doupdate)
   (info "[~A] waiting for sync~%" (seconds->string))
   (let ((th (gochan-recv ui-chan)))
     (receive (who datum) (thread-join! th)
@@ -100,11 +104,4 @@
                        (wprintw win "~%~A" (print-event evt (room-context room)))
                        (room-context-set! room (update-context (room-context room) evt)))
                      events)
-    (when (eq? room-id (current-room))
-      (show-win win))
   ))
-
-(define (show-win win)
-  (wrefresh win)
-  (wrefresh statuswin)
-  (wrefresh inputwin))

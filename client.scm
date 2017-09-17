@@ -205,7 +205,6 @@
 
 (define (start-interface)
   (initscr)
-  (refresh)
   (noecho)
   (cbreak)
   (start_color)
