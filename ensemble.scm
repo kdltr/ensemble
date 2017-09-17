@@ -14,6 +14,7 @@
 (use utf8 utf8-srfi-13 vector-lib clojurian-syntax uri-common openssl
      ncurses gochan miscmacros srfi-1 posix irregex srfi-18)
 
+(on-exit endwin)
 (include "client.scm")
 )
 
