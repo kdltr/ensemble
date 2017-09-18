@@ -107,19 +107,6 @@
 (define (initial-context state)
   (vector-fold (lambda (i ctx evt) (update-context ctx evt)) '() state))
 
-;; Updates a timeline from a vector of events, attaching context to them
-(define (advance-timeline timeline ctx evts)
-  (let loop ((ctx ctx)
-             (i 0)
-             (timeline timeline))
-    (if (= i (vector-length evts))
-        timeline
-        (let* ((evt (vector-ref evts i))
-               (new-ctx (update-context ctx evt)))
-          (loop new-ctx
-                (add1 i)
-                (cons (mupdate '(_context) new-ctx evt)
-                      timeline))))))
 
 
 ;; Events printers
@@ -164,38 +151,6 @@
         (printer evt ctx)
         (sprintf "No event printer for ~a: ~s" type content))))
 
-
-;; Stuff
-;; =====
-
-(define (initial-timelines batch)
-  (let* ((rooms (mref '(rooms join) batch))
-         (contexts (map (o initial-context (cut mref '(state events) <>) cdr) rooms))
-         (timelines (map
-                      (lambda (p ctx) (cons (car p)
-                                            (advance-timeline '() ctx (mref '(timeline events) (cdr p)))))
-                      rooms contexts)))
-    timelines))
-
-(define (advance-timelines timelines batch)
-  (if (null? timelines)
-      '()
-      (let* ((room (car timelines))
-             (room-id (car room))
-             (timeline (cdr room))
-             (batch-timeline (mref `(rooms join ,room-id timeline events) batch)))
-        (cons (cons room-id
-                    (advance-timeline timeline
-                                      (mref '(_context) (car timeline))
-                                      (or batch-timeline #())))
-              (advance-timelines (cdr timelines) batch)))))
-
-(define (rooms-contexts tls)
-  (map
-    (lambda (p)
-      (cons (car p)
-            (mref '(_context) (cadr p))))
-    tls))
 
 
 (define tty-fileno 0)

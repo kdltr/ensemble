@@ -89,8 +89,6 @@
   (thread-wait-for-i/o! tty-fileno #:input)
   (wget_wch inputwin))
 
-
-
 (define (advance-room room-data)
   (let* ((room-id (car room-data))
          (room (or (alist-ref room-id *rooms*)
