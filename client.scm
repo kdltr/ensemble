@@ -214,7 +214,10 @@
 
   (set! inputwin (newwin 1 cols (- rows 1) 0))
   (keypad inputwin #t)
-  (set! statuswin (newwin 1 cols (- rows 2) 0)))
+  (set! statuswin (newwin 1 cols (- rows 2) 0))
+  (init_pair 1 COLOR_BLACK COLOR_WHITE)
+  (wbkgdset statuswin (COLOR_PAIR 1))
+  )
 
 (define current-room (make-parameter #f))
 

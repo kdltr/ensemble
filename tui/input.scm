@@ -11,7 +11,7 @@
       (char=? c #\delete)))
 
 (define (refresh-inputwin)
-  (wclear inputwin)
+  (werase inputwin)
   (wprintw inputwin "~A" (buffer-window))
   (wmove inputwin 0 (cursor-position)))
 

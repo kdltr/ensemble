@@ -7,12 +7,9 @@
     (if room
         (begin 
           (current-room room-id)
-          (wclear statuswin)
-          (wattron statuswin A_REVERSE)
-          (waddstr statuswin (string-pad-right (sprintf "Room: ~a"
-                                                        (or (mref '(name) (room-context room))
-                                                            room-id))
-                                         (sub1 cols) #\space))
+          (werase statuswin)
+          (wprintw statuswin "Room: ~a" (or (mref '(name) (room-context room))
+                                            room-id))
           (redrawwin (room-window room))
           )
         #f)))
