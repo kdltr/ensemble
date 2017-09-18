@@ -177,7 +177,7 @@
 
 (define ui-chan (gochan 0))
 
-(define-record room window context)
+(define-record room window context notification)
 (define *rooms* '())
 
 (include "tui.scm")

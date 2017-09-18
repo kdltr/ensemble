@@ -2,14 +2,33 @@
 
 (include "tui/input.scm")
 
+(define (refresh-statuswin)
+  (let* ((notifs (filter-map (lambda (r)
+                               (and (room-notification (cdr r))
+                                    (room-name (car r))))
+                             *rooms*))
+         (status (sprintf "Room: ~a | ~a" (room-name (current-room)) notifs)))
+    (werase statuswin)
+    (wprintw statuswin "~a" (substring status 0 (min (string-length status) (sub1 cols))))))
+
+(define (room-name id)
+  (let* ((ctx (room-context (alist-ref id *rooms*)))
+         (members (alist-ref 'members ctx))
+         (member-names (alist-ref 'member-names ctx))
+         (other (car (delete (mxid) members))))
+    (or (alist-ref 'name ctx)
+        (and (= (length members) 2)
+             (or (alist-ref other member-names string=?)
+                 other))
+        (symbol->string id))))
+
 (define (switch-room room-id)
   (let ((room (alist-ref room-id *rooms*)))
     (if room
-        (begin 
+        (begin
           (current-room room-id)
-          (werase statuswin)
-          (wprintw statuswin "Room: ~a" (or (mref '(name) (room-context room))
-                                            room-id))
+          (room-notification-set! room #f)
+          (refresh-statuswin)
           (redrawwin (room-window room))
           )
         #f)))
@@ -42,7 +61,7 @@
                     (idlok #t)
                     (wmove (- rows 3) 0)))
          (ctx (initial-context events))
-         (room (make-room win ctx)))
+         (room (make-room win ctx #f)))
     (push! (cons room-id room) *rooms*)
     room))
 
@@ -53,6 +72,8 @@
     (switch-room (caar *rooms*))
     (defer 'sync sync timeout: 30000 since: (handle-sync first-batch))
     (defer 'input get-input)
+    (for-each (lambda (r) (room-notification-set! (cdr r) #f)) *rooms*)
+    (refresh-statuswin)
     (main-loop)))
 
 (define (main-loop)
@@ -99,4 +120,7 @@
                        (wprintw win "~%~A" (print-event evt (room-context room)))
                        (room-context-set! room (update-context (room-context room) evt)))
                      events)
+    (unless (or (eq? (current-room) room-id) (vector-empty? events))
+      (room-notification-set! room #t)
+      (refresh-statuswin))
   ))
