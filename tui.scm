@@ -15,11 +15,11 @@
   (let* ((ctx (room-context (alist-ref id *rooms*)))
          (members (alist-ref 'members ctx))
          (member-names (alist-ref 'member-names ctx))
-         (other (car (delete (mxid) members))))
+         (others (delete (mxid) members)))
     (or (alist-ref 'name ctx)
         (and (= (length members) 2)
              (or (alist-ref other member-names string=?)
-                 other))
+                 (car others)))
         (symbol->string id))))
 
 (define (switch-room room-id)
