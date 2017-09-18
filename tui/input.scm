@@ -71,6 +71,21 @@
   (buffer-insert! c)
   (move-cursor))
 
+(define char-set:non-white
+  (char-set-complement char-set:white-space))
+
+(define (find-word-left str pos)
+  (if (char-set-contains? char-set:white-space (string-ref str pos))
+      (let ((skipped (string-index-right str char-set:non-white 0 pos)))
+        (if skipped (find-word-left str skipped) 0))
+      (add1 (or (string-skip-right str char-set:non-white 0 pos) -1))))
+
+(define (find-word-right str pos)
+  (if (char-set-contains? char-set:white-space (string-ref str pos))
+      (let ((skipped (string-index str char-set:non-white pos)))
+        (if skipped (find-word-right str skipped) (sub1 (string-length str))))
+      (sub1 (or (string-skip str char-set:non-white pos) (string-length str)))))
+
 
 
 ;; Key bindings
@@ -130,6 +145,33 @@
         ;; Any code for the ESC key alone here:
         (void))))
 
+
+(define-key #(#\escape #\b)
+  (define (left)
+    (find-word-left input-string (min (sub1 (string-length input-string))
+                                      cursor-pos)))
+  (let ((new-pos (left)))
+    (if (and (= new-pos cursor-pos) (not (zero? new-pos)))
+        (begin (move-cursor -1)
+               (move-cursor (- (left) cursor-pos)))
+        (move-cursor (- new-pos cursor-pos)))))
+
+(define-key #(#\escape #\f)
+  (define (right)
+    (find-word-right input-string (min (sub1 (string-length input-string))
+                                       cursor-pos)))
+  (let ((new-pos (right)))
+    (if (and (= new-pos cursor-pos) (not (= new-pos (string-length input-string))))
+        (begin (move-cursor)
+               (move-cursor (- (right) cursor-pos)))
+        (move-cursor (add1 (- new-pos cursor-pos))))))
+
+(define-key #(#\escape #\d)
+  (unless (= cursor-pos (string-length input-string))
+    (set! input-string
+      (string-append
+        (substring input-string 0 cursor-pos)
+        (substring input-string (add1 (find-word-right input-string cursor-pos)))))))
 
 
 

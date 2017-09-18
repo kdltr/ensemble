@@ -42,6 +42,9 @@ Available key bindings
 - `C-a` moves the cursor at the beginning of the line
 - `C-f` moves the cursor at the end of the line
 - `C-k` removes all characters starting at the cursor position
+- `M-b` moves the cursor back one word
+- `M-f` moves the cursor forward one word
+- `M-d` removes the word at the right of the cursor
 
 TUI Roadmap and ideas
 ---------------------

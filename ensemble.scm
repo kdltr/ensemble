@@ -11,7 +11,8 @@
           substring=? substring-ci=? substring-index substring-index-ci)
   (except extras
           read-string write-string read-token))
-(use utf8 utf8-srfi-13 vector-lib clojurian-syntax uri-common openssl
+(use utf8 utf8-srfi-13 utf8-srfi-14 unicode-char-sets
+     vector-lib clojurian-syntax uri-common openssl
      ncurses gochan miscmacros srfi-1 posix irregex srfi-18)
 
 (include "client.scm")
