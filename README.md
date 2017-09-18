@@ -7,6 +7,7 @@ Only the most basic features have been implemented:
 - message receiving
 - message sending
 - emotes
+- basic notifications
 
 The text user interface is very crude and has a few bugs.
 
@@ -16,28 +17,31 @@ If you want to support this project, consider donating [on liberapay](https://li
 How to use it
 -------------
 
-You have to start a new terminal that will be used by the client for its interface. I usually run `tty; sleep 9999999` in it so that I get the path to its pty and to make it ignore any input.
+Compile it with `csc ensemble.scm` then run `./ensemble`
 
-You then have to define the TTY environment variable in the shell you want to run the client, like so `export TTY=/dev/pts/N`, where N is the pty of the new terminal you opened.
+It will prompt you for your server’s URL and credentials.
 
-At last, run `csi client.scm` in this directory and use the `(init! <server>)`, `(password-login <user> <password>)` and `(startup)` procedures, like so:
-
-    (init! "https://upyum.com")
-    (password-login "toto" "my-super-password")
-    (startup)
-
-
-You can quit by typing /exit at the input prompt, your session will be saved in `config.scm` and automatically loaded back next time so that you only have to run the `(startup)` procedure (or directly run `csi client.scm -e '(startup)'`).
+You can quit by typing /exit or /quit at the input prompt, your session will be saved in `config.scm` and automatically loaded back next time.
 
 
 Available commands
 ------------------
 
 - `/me text` sends an emote
-- `/rooms` lists the rooms you are in in the status bar
-- `/room room-id` moves you to the given room
-- `/exit` saves the session to config.scm and quits
+- `/room regexp` (or `/r regexp`) room moves you to the given room
+- `/exit` or `/quit` saves the session to config.scm and quits
 
+
+Available key bindings
+----------------------
+
+- `backspace` removes the character before the cursor
+- `C-d` removes the character at the cursor
+- `left` or `C-b` moves the cursor back one character
+- `right` or `C-f` moves the cursor forward one character
+- `C-a` moves the cursor at the beginning of the line
+- `C-f` moves the cursor at the end of the line
+- `C-k` removes all characters starting at the cursor position
 
 TUI Roadmap and ideas
 ---------------------
