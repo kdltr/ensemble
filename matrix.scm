@@ -1,7 +1,5 @@
 (include "low-level.scm")
 
-(use clojurian-syntax)
-
 ;; Helper procedures
 ;; =================
 

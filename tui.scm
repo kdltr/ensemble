@@ -1,5 +1,3 @@
-(use utf8)
-
 (include "tui/input.scm")
 
 (define (refresh-statuswin)

@@ -1,6 +1,6 @@
 (module client-mod (init! password-login access-token account-name mxid sync-filter server-uri startup
                     save-config)
-(import 
+(import
   (except scheme
           string-length string-ref string-set! make-string string substring
           string->list list->string string-fill! write-char read-char display)
@@ -11,9 +11,12 @@
           substring=? substring-ci=? substring-index substring-index-ci)
   (except extras
           read-string write-string read-token))
+
 (use utf8 utf8-srfi-13 utf8-srfi-14 unicode-char-sets
      vector-lib clojurian-syntax uri-common openssl
-     ncurses gochan miscmacros srfi-1 posix irregex srfi-18)
+     ncurses gochan miscmacros srfi-1 posix irregex
+     srfi-18 intarweb (except medea read-json) cjson
+     rest-bind uri-common (prefix http-client http:))
 
 (include "client.scm")
 )

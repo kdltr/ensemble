@@ -1,8 +1,6 @@
 ;; Low-level procedures for Matrix clients’ API
- 
-(import scheme chicken)
-(use intarweb uri-common openssl (prefix http-client http:) rest-bind (except medea read-json) (only cjson string->json) vector-lib)
 
+;; Emulates medea’s read-json with cjson
 (define (read-json port)
   (string->json (read-string #f port)))
 
