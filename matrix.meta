@@ -1,0 +1,4 @@
+((egg "matrix")
+ (category net)
+ (needs utf8 http-client rest-bind openssl intarweb gochan
+        uri-common medea cjson vector-lib clojurian))
