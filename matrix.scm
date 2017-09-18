@@ -37,13 +37,14 @@
       (sprintf "~a-~a" (current-seconds) cnt))))
 
 (define account-name (make-parameter #f))
+(define mxid (make-parameter #f))
 (define (password-login user password)
-  (account-name user)
-  (->> (login `((type . "m.login.password")
-                (user . ,user)
-                (password . ,password)))
-       (alist-ref 'access_token)
-       (access-token)))
+  (let ((res (login `((type . "m.login.password")
+                      (user . ,user)
+                      (password . ,password)))))
+    (account-name user)
+    (mxid (alist-ref 'user_id res))
+    (access-token (alist-ref 'access_token res))))
 
 ;; TODO do that properly when low-level is a module
 (define logout

@@ -24,12 +24,10 @@
   (make-ssl-server-connector
     (ssl-make-client-context* verify?: (not (member "--no-ssl-verify" (command-line-arguments))))))
 
-
 (define sync-filter (make-parameter #f))
 
-(define (mxid)
-  (string-append "@" (account-name) ":" (uri-host (server-uri))))
- 
+
+
 ;; Config file
 ;; ===========
 
@@ -43,6 +41,7 @@
       (for-each write `((init! ,(uri->string (server-uri)))
                         (access-token ,(access-token))
                         (account-name ,(account-name))
+                        (mxid ,(mxid))
                         (sync-filter ,(sync-filter)))))))
 
 

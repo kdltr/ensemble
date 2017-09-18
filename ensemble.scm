@@ -1,4 +1,4 @@
-(module client-mod (init! password-login access-token account-name sync-filter server-uri startup
+(module client-mod (init! password-login access-token account-name mxid sync-filter server-uri startup
                     save-config)
 (import 
   (except scheme
@@ -45,11 +45,12 @@
          (define init! client-mod#init!)
          (define access-token client-mod#access-token)
          (define account-name client-mod#account-name)
-         (define sync-filter client-mod#sync-filter)))
+         (define sync-filter client-mod#sync-filter)
+         (define mxid client-mod#mxid)))
 (when (file-exists? "config.scm")
   (for-each eval (read-file "config.scm")))
 
-(unless (and (server-uri) (access-token))
+(unless (and (server-uri) (access-token) (mxid))
   (prompt-credentials))
 
 (startup)
