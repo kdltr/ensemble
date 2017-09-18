@@ -77,7 +77,7 @@
 ;; ============
 
 (define (handle-key k)
-  (and-let* ((proc (alist-ref k keys))) (proc)))
+  (and-let* ((proc (alist-ref k keys equal?))) (proc)))
 
 (define keys '())
 (define-syntax define-key
@@ -119,6 +119,17 @@
         (defer 'message message:text (current-room) input-string))
     (set! input-string "")
     (move-cursor 'left)))
+
+(define-key #\escape
+  (wtimeout inputwin 0)
+  (let ((next (wget_wch inputwin)))
+    (wtimeout inputwin -1)
+    (if next
+        ;; ESC+key, usually used for Alt+key
+        (handle-key (vector #\escape next))
+        ;; Any code for the ESC key alone here:
+        (void))))
+
 
 
 
