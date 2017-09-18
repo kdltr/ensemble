@@ -14,12 +14,11 @@
 (use utf8 utf8-srfi-13 vector-lib clojurian-syntax uri-common openssl
      ncurses gochan miscmacros srfi-1 posix irregex srfi-18)
 
-(on-exit endwin)
 (include "client.scm")
 )
 
 (module main ()
-(import scheme (except chicken reset) extras client-mod)
+(import scheme (except chicken reset) extras client-mod (only ncurses endwin))
 
 (cond-expand
       (csi (enable-warnings #t))
@@ -53,5 +52,12 @@
 (unless (and (server-uri) (access-token) (mxid))
   (prompt-credentials))
 
-(startup)
+(handle-exceptions exn
+  (begin
+    (on-exit void)
+    ;; Disable ncurses before printing the error message and call trace
+    (endwin)
+    (signal exn))
+  (on-exit endwin)
+  (startup))
 )
