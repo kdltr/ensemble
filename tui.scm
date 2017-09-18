@@ -18,7 +18,7 @@
          (others (delete (mxid) members)))
     (or (alist-ref 'name ctx)
         (and (= (length members) 2)
-             (or (alist-ref other member-names string=?)
+             (or (alist-ref (car others) member-names string=?)
                  (car others)))
         (symbol->string id))))
 
