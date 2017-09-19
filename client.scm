@@ -138,11 +138,11 @@
         (sprintf "<~a> [redacted]" name))
         ))
 
+;; TODO fix this mess up
 (define (m.room.member-printer evt ctx)
   (let* ((who (mref '(state_key) evt))
-         (name (or (mref '(content displayname) evt)
-                   (mref `(member-names ,who) ctx)
-                   who))
+         (maybe-name (mref '(content displayname) evt))
+         (name (if (or (not maybe-name) (eq? maybe-name 'null)) who maybe-name))
          (what (case (string->symbol (mref '(content membership) evt))
                  ((invite)
                   "was invited to the room")
@@ -154,8 +154,10 @@
                            (cond ((not (equal? old-name name))
                                   (sprintf "is the new name of ~A" old-name))
                                  ((not (equal? old-avatar new-avatar))
-                                  (sprintf "has a new avatar: ~A" (or (mxc->url new-avatar)
-                                                                      "nothing")))
+                                  (sprintf "has a new avatar: ~A" (if (or (not new-avatar)
+                                                                          (eq? new-avatar 'null))
+                                                                      "nothing"
+                                                                      (mxc->url new-avatar))))
                                  (else "is just there ǒ_o"))))
                         (else "joined the room")))
                  ((leave)
