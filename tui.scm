@@ -79,7 +79,6 @@
   (wnoutrefresh statuswin)
   (wnoutrefresh inputwin)
   (doupdate)
-  (info "[~A] waiting for sync~%" (seconds->string))
   (let ((th (gochan-recv ui-chan)))
     (receive (who datum) (thread-join! th)
       (case who

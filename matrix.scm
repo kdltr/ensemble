@@ -3,6 +3,15 @@
 ;; Helper procedures
 ;; =================
 
+(define (json-false? o)
+  (or (equal? o #f)
+      (equal? o 'null)
+      (equal? o "")
+      (equal? o 0)))
+
+(define (json-true? o)
+  (and (not (json-false? o)) o))
+
 (define (mref keys alist)
   (if (null? keys)
       alist
