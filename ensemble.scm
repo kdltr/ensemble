@@ -16,7 +16,8 @@
      vector-lib clojurian-syntax uri-common openssl
      ncurses gochan miscmacros srfi-1 posix irregex
      srfi-18 intarweb (except medea read-json) cjson
-     rest-bind uri-common (prefix http-client http:))
+     rest-bind uri-common (prefix http-client http:)
+     ensemble.utils)
 
 (include "client.scm")
 )

@@ -7,11 +7,11 @@
                              *rooms*))
          (status (sprintf "Room: ~a | ~a" (room-name (current-room)) notifs)))
     (werase statuswin)
-    (wprintw statuswin "~a" (substring status 0 (min (string-length status) (sub1 cols))))))
+    (waddnstr statuswin status (sub1 cols))))
 
 (define (room-name id)
   (let* ((ctx (room-context (alist-ref id *rooms*)))
-         (members (alist-ref 'members ctx))
+         (members (or (alist-ref 'members ctx) '()))
          (member-names (alist-ref 'member-names ctx))
          (others (delete (mxid) members)))
     (or (alist-ref 'name ctx)

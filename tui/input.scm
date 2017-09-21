@@ -12,7 +12,7 @@
 
 (define (refresh-inputwin)
   (werase inputwin)
-  (wprintw inputwin "~A" (buffer-window))
+  (waddnstr inputwin (buffer-window) (sub1 cols))
   (wmove inputwin 0 (cursor-position)))
 
 
@@ -43,10 +43,7 @@
              (- pos (sub1 cols)))))))
 
 (define (buffer-window)
-  (substring input-string
-             extent-start
-             (min (+ extent-start (sub1 cols))
-                  (string-length input-string))))
+  (substring input-string extent-start))
 
 (define (cursor-position)
   (- cursor-pos extent-start))
