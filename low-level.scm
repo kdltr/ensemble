@@ -78,6 +78,7 @@
 
 (define-endpoint POST (room-join "rooms" room-id "join"))
 (define-endpoint PUT (room-send "rooms" room-id "send" event-type transaction-id))
+(define-endpoint GET (room-messages "rooms" room-id "messages" #!key from to dir limit))
 
 (define-endpoint GET (get-filter "user" user-id "filter" filter-id))
 (define-endpoint POST (create-filter "user" user-id "filter"))
