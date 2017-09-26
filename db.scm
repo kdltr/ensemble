@@ -1,5 +1,7 @@
 (void)
 
+(define +database-version+ 1)
+
 (define db-file
   (make-pathname (or (get-environment-variable "XDG_CONFIG_HOME")
                      (make-pathname (get-environment-variable "HOME") ".config"))
@@ -50,13 +52,6 @@ EOF
   (exec init-events-stmts)
   (exec init-branches-stmts))
 
-(when (not (= 5 (length (schema db))))
-  (exec (sql db "DROP TABLE IF EXISTS config;"))
-  (exec (sql db "DROP TABLE IF EXISTS events;"))
-  (exec (sql db "DROP TABLE IF EXISTS states;"))
-  (exec (sql db "DROP TABLE IF EXISTS branches;"))
-  (initialize-db))
-
 (define (sexp->string sexp)
   (with-output-to-string (lambda () (write sexp))))
 
@@ -68,7 +63,16 @@ EOF
     (and v (string->sexp v))))
 
 (define (fetch-column-sexps o)
-  (map string->sexp (fetch-column o)))
+  (map! string->sexp (fetch-column o)))
+
+(define (fetch-row-sexps o)
+  (map! string->sexp (fetch-row o)))
+
+(define (fetch-rows-sexps o)
+  (let lp ((row (fetch-row-sexps o)))
+    (if (null? row)
+        '()
+        (cons row (lp (fetch-row-sexps o))))))
 
 
 
@@ -114,4 +118,33 @@ EOF
 (define (room-exists? id)
   (query fetch-sexp
          (sql db "SELECT id FROM branches WHERE id = ?;")
-         id))
+         (sexp->string id)))
+
+(define (room-timeline id #!key (limit -1) (offset 0))
+  (query fetch-rows-sexps
+         (sql db "SELECT events.content, states.content
+                  FROM branches
+                  INNER JOIN events ON branches.event = events.id
+                  INNER JOIN states ON events.context = states.id
+                  WHERE branches.id = ?
+                  ORDER BY branches.sequence_number DESC
+                  LIMIT ? OFFSET ?;")
+         (sexp->string id) limit offset))
+
+(define (room-context-and-id room-id)
+  (query fetch-row-sexps
+         (sql db "SELECT states.id, states.content
+                  FROM branches
+                  INNER JOIN events ON branches.event = events.id
+                  INNER JOIN states ON events.context = states.id
+                  WHERE branches.id = ?
+                  ORDER BY branches.sequence_number DESC LIMIT 1;")
+         (sexp->string room-id)))
+
+(define (room-context room-id) (cadr (room-context-and-id room-id)))
+
+(when (not (= +database-version+ (config-ref 'database-version)))
+  (exec (sql db "DROP TABLE IF EXISTS events;"))
+  (exec (sql db "DROP TABLE IF EXISTS states;"))
+  (exec (sql db "DROP TABLE IF EXISTS branches;"))
+  (initialize-db))

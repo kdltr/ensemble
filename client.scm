@@ -164,6 +164,7 @@
 (define cols)
 (define inputwin)
 (define statuswin)
+(define messageswin)
 
 (define (start-interface)
   (initscr)
@@ -171,6 +172,11 @@
   (cbreak)
   (start_color)
   (set!-values (rows cols) (getmaxyx (stdscr)))
+
+  (set! messageswin (newwin (- rows 2) cols 0 0))
+  (scrollok messageswin #t)
+  (idlok messageswin #t)
+  (wmove messageswin (- rows 3) 0)
 
   (set! inputwin (newwin 1 cols (- rows 1) 0))
   (keypad inputwin #t)
@@ -183,7 +189,6 @@
 
 (define ui-chan (gochan 0))
 
-(define-record room window context notification)
-(define *rooms* '())
+(define *notifications* '())
 
 (include "tui.scm")
