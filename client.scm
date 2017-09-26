@@ -3,12 +3,10 @@
 
 (cond-expand
       (csi (define (info fmt . args)
-               (apply fprintf (current-error-port) fmt args))
-           (load "locale.so"))
+               (apply fprintf (current-error-port) fmt args)))
       (else (define-syntax info
               (syntax-rules ()
-                ((info . rest) (void))))
-            (include "locale.scm")))
+                ((info . rest) (void))))))
 
 (include "matrix.scm")
 
