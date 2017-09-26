@@ -205,5 +205,4 @@
   (defer 'message message:emote (current-room) (string-join args " ")))
 
 (define-command (exit quit) args
-  (save-config)
   (exit))

@@ -24,25 +24,16 @@
   (make-ssl-server-connector
     (ssl-make-client-context* verify?: (not (member "--no-ssl-verify" (command-line-arguments))))))
 
-(define sync-filter (make-parameter #f))
 
 
+;; Configuration
+;; =============
 
-;; Config file
-;; ===========
+(let ((uri (config-ref 'server-uri)))
+  (when uri (init! uri))
+  (access-token (config-ref 'access-token))
+  (mxid (config-ref 'mxid)))
 
-(define (reload)
-  (save-config)
-  (load "client"))
-
-(define (save-config)
-  (with-output-to-file "config.scm"
-    (lambda ()
-      (for-each write `((init! ,(uri->string (server-uri)))
-                        (access-token ,(access-token))
-                        (account-name ,(account-name))
-                        (mxid ,(mxid))
-                        (sync-filter ,(sync-filter)))))))
 
 
 ;; Events contexts

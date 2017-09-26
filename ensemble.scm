@@ -1,5 +1,5 @@
-(module client-mod (init! password-login access-token account-name mxid sync-filter server-uri startup
-                    save-config)
+(module client-mod (init! password-login access-token server-uri mxid startup
+                    config-ref config-set!)
 (import
   (except scheme
           string-length string-ref string-set! make-string string substring
@@ -10,20 +10,24 @@
           ->string conc string-chop string-split string-translate
           substring=? substring-ci=? substring-index substring-index-ci)
   (except extras
-          read-string write-string read-token))
+          read-string write-string read-token)
+  ports files)
 
 (use utf8 utf8-srfi-13 utf8-srfi-14 unicode-char-sets
      vector-lib clojurian-syntax uri-common openssl
      ncurses gochan miscmacros srfi-1 posix irregex
      srfi-18 intarweb (except medea read-json) cjson
      rest-bind uri-common (prefix http-client http:)
-     ensemble.utils)
+     ensemble.utils sql-de-lite)
 
+(include "db.scm")
 (include "client.scm")
 )
 
+
 (module main ()
 (import scheme (except chicken reset) extras client-mod (only ncurses endwin))
+(use (only uri-common uri->string))
 
 (cond-expand
       (csi (enable-warnings #t))
@@ -42,17 +46,9 @@
 (define (prompt-credentials)
   (init! (prompt "Enter your server URL (example: https://matrix.org): "))
   (password-login (prompt "Username: ") (prompt "Password: " #t))
-  (save-config))
-
-;; TODO ugly hack
-(eval '(begin
-         (define init! client-mod#init!)
-         (define access-token client-mod#access-token)
-         (define account-name client-mod#account-name)
-         (define sync-filter client-mod#sync-filter)
-         (define mxid client-mod#mxid)))
-(when (file-exists? "config.scm")
-  (for-each eval (read-file "config.scm")))
+  (config-set! 'mxid (mxid))
+  (config-set! 'server-uri (uri->string (server-uri)))
+  (config-set! 'access-token (access-token)))
 
 (unless (and (server-uri) (access-token) (mxid))
   (prompt-credentials))
