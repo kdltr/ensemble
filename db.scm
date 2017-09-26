@@ -47,7 +47,6 @@ EOF
 ))
 
 (define (initialize-db)
-  (exec init-config-stmts)
   (exec init-states-stmts)
   (exec init-events-stmts)
   (exec init-branches-stmts))
@@ -143,8 +142,13 @@ EOF
 
 (define (room-context room-id) (cadr (room-context-and-id room-id)))
 
-(when (not (= +database-version+ (config-ref 'database-version)))
-  (exec (sql db "DROP TABLE IF EXISTS events;"))
-  (exec (sql db "DROP TABLE IF EXISTS states;"))
-  (exec (sql db "DROP TABLE IF EXISTS branches;"))
-  (initialize-db))
+(handle-exceptions exn
+  (begin
+    (initialize-db)
+    (exec init-config-stmts)
+    (config-set! 'database-version +database-version+))
+  (when (not (= +database-version+ (config-ref 'database-version)))
+    (exec (sql db "DROP TABLE IF EXISTS events;"))
+    (exec (sql db "DROP TABLE IF EXISTS states;"))
+    (exec (sql db "DROP TABLE IF EXISTS branches;"))
+    (initialize-db)))
