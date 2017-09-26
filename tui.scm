@@ -13,7 +13,7 @@
       (lambda (evt+ctx)
         (wprintw messageswin "~A" (print-event (car evt+ctx) (cadr evt+ctx)))
         (let-values (((l c) (getyx messageswin)))
-          (unless (zero? c) (wmove messageswin (add1 l) 0))
+          (unless (zero? c) (wprintw messageswin "~%"))
         ))
       (reverse timeline))))
 
