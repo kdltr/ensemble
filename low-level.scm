@@ -6,7 +6,7 @@
 
 (cond-expand
       (csi (use describe trace)
-           (trace read-json json->string))
+           #;(trace read-json json->string))
       (else))
 
 ;; Chaque requête :
@@ -52,7 +52,7 @@
                                             uri: uri-rewritten
                                             headers: headers-rewritten)))
     (cond-expand
-          (csi (fprintf (current-error-port) "SENDING REQUEST:\n")
+          #;(csi (fprintf (current-error-port) "SENDING REQUEST:\n")
                (describe request-rewritten (current-error-port))
                (newline (current-error-port)))
           (else))

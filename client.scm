@@ -48,60 +48,39 @@
 ;; Events contexts
 ;; ===============
 
-(define context-updaters
-  `((m.room.create . ,(lambda (ctx evt)
-                        (mupdate '(creator)
-                                (mref '(content creator) evt)
-                                ctx)))
-    ;; TODO: Take care of the `ban` membership
-    (m.room.member . ,(lambda (ctx evt)
-                        (let ((membership (string->symbol (mref '(content membership) evt)))
-                              (who (mref '(state_key) evt))
-                              (display-name (mref '(content displayname) evt))
-                              (avatar-url (mref '(content avatar_url) evt)))
-                          (as-> ctx ctx
-                                (case membership
-                                  ((invite)
-                                   (mupdate '(invited) (lset-adjoin string=? (or (mref '(invited) ctx) '()) who) ctx))
-                                  ((join)
-                                   (mupdate '(members) (lset-adjoin string=? (or (mref '(members) ctx) '()) who) ctx))
-                                  ((leave)
-                                   (mupdate '(members) (delete who (or (mref '(members) ctx) '())) ctx))
-                                  (else
-                                    (warning "Unknown membership from m.room.member event" membership)
-                                    ctx))
-                                (if (json-true? display-name)
-                                    (mupdate `(member-names ,who) display-name ctx)
-                                    (mdelete `(member-names ,who) ctx))
-                                (if (json-true? avatar-url)
-                                    (mupdate `(member-avatars ,who) avatar-url ctx)
-                                    (mdelete `(member-avatars ,who) ctx))))))
-    (m.room.name . ,(lambda (ctx evt)
-                      (let ((name (mref '(content name) evt)))
-                        (if (json-false? name)
-                            (mdelete '(name) ctx)
-                            (mupdate '(name) name ctx)))))
-    (m.room.topic . ,(lambda (ctx evt)
-                       (let ((topic (mref '(content topic) evt)))
-                         (if (json-false? topic)
-                             (mdelete '(topic) ctx)
-                             (mupdate '(topic) topic ctx)))))
-    (m.room.avatar . ,(lambda (ctx evt)
-                        (let ((url (mref '(content url) evt)))
-                          (mupdate '(avatar) url ctx))))
-    ))
 
 (define (update-context ctx evt)
-  (let* ((evt-type (string->symbol (mref '(type) evt)))
-         (updater (alist-ref evt-type context-updaters)))
-    (if updater
-        (updater ctx evt)
-        (begin 
-          (warning "No context updater for event" evt-type)
-          ctx))))
+  (if (mref '(state_key) evt)
+      (alist-update (cons (state-key evt)
+                          (string->symbol (mref '(type) evt)))
+                    (mref '(content) evt)
+                    ctx equal?)
+      ctx))
 
 (define (initial-context state)
-  (vector-fold (lambda (i ctx evt) (update-context ctx evt)) '() state))
+  (vector-fold (lambda (i ctx evt)
+                 (cons (cons (cons (state-key evt)
+                                   (string->symbol (mref '(type) evt)))
+                             (mref '(content) evt))
+                       ctx))
+               '() state))
+
+(define (state-key evt)
+  (string-downcase (mref '(state_key) evt)))
+
+(define (member-displayname who ctx)
+  (json-true? (mref `((,(string-downcase who) . m.room.member) displayname) ctx)))
+
+(define (member-avatar who ctx)
+  (json-true? (mref `((,(string-downcase who) . m.room.member) avatar_url) ctx)))
+
+(define (room-name ctx)
+  (json-true? (mref `(("" . m.room.name) name) ctx)))
+
+(define (room-members ctx)
+  (filter (lambda (p) (and (equal? (cdar p) 'm.room.member)
+                           (equal? "join" (alist-ref 'membership (cdr p)))))
+            ctx))
 
 
 
@@ -120,7 +99,7 @@
 
 (define (m.room.message-printer evt ctx)
   (let* ((sender (mref '(sender) evt))
-         (name (or (mref `(member-names ,sender) ctx)
+         (name (or (member-displayname sender ctx)
                    sender))
          (type (mref '(content msgtype) evt))
          (body (mref '(content body) evt)))
@@ -135,12 +114,15 @@
         ))
 
 ;; TODO fix this mess up
+;; TODO membership may be ban, leave… in the context
 (define (m.room.member-printer evt ctx)
-  (let* ((who (mref '(state_key) evt))
+  (let* ((who (state-key evt))
          (membership (string->symbol (mref '(content membership) evt)))
          (maybe-name (json-true? (mref '(content displayname) evt)))
          (maybe-avatar (json-true? (mref '(content avatar_url) evt)))
-         (displayed-name (or maybe-name (mref `(member-names ,who) ctx) who)))
+         (displayed-name (or maybe-name
+                             (member-displayname who ctx)
+                             who)))
     (case membership
       ((invite)
        (sprintf "*** ~A was invited to the room" displayed-name))
@@ -151,19 +133,19 @@
       ((knock)
        (sprintf "*** ~A knocked" displayed-name))
       ((join)
-       (if (member who (or (mref '(members) ctx) '()))
-           (let* ((old-name (mref `(member-names ,who) ctx))
-                  (old-avatar (mref `(member-avatars, who) ctx))
+       (if (equal? "join" (mref `((,who . m.room.member) membership) ctx))
+           (let* ((old-name (member-displayname who ctx))
+                  (old-avatar (member-avatar who ctx))
                   (same-name (equal? old-name maybe-name))
                   (same-avatar (equal? old-avatar maybe-avatar)))
              (cond ((and (not same-name) (not same-avatar))
                     (sprintf "*** ~A changed its name to ~A and avatar to ~A"
-                             old-name displayed-name (if maybe-avatar
-                                                         (mxc->url maybe-avatar)
-                                                         "nothing")))
+                             (or old-name who) displayed-name (if maybe-avatar
+                                                                  (mxc->url maybe-avatar)
+                                                                  "nothing")))
                    ((not same-name)
                     (sprintf "*** ~A changed its name to ~A"
-                             old-name displayed-name))
+                             (or old-name who) displayed-name))
                    ((not same-avatar)
                     (sprintf "*** ~A changed its avatar to ~A"
                              displayed-name (if maybe-avatar
