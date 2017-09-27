@@ -8,6 +8,7 @@
                  "ensemble.dat"))
 
 (define db (open-database db-file))
+(set-busy-handler! db (busy-timeout 10000))
 (exec (sql db "PRAGMA foreign_keys = ON;"))
 
 (define init-config-stmts (sql db #<<EOF
