@@ -129,11 +129,10 @@
                            (state-set! evt-id evt))
                          ))
                      events)
-    (when update-ui
-    (if (eq? (current-room) room-id)
-        (unless (vector-empty? events)
-          (refresh-messageswin))
-        (begin
-          (set! *notifications* (lset-adjoin eq? *notifications* room-id))
-          (refresh-statuswin))))
+    (when (and update-ui (not (vector-empty? events)))
+      (if (eq? (current-room) room-id)
+          (refresh-messageswin)
+          (begin
+            (set! *notifications* (lset-adjoin eq? *notifications* room-id))
+            (refresh-statuswin))))
   ))
