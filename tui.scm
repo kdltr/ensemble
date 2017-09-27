@@ -67,6 +67,8 @@
     (list state-id state)))
 
 (define (startup)
+  (set! (signal-handler signal/winch)
+    (lambda (_) (defer 'resize (lambda () #t))))
   (start-interface)
   (let* ((first-batch (sync since: (config-ref 'next-batch)))
          (next (handle-sync first-batch #f)))
@@ -86,6 +88,7 @@
       (case who
         ((sync) (defer 'sync sync timeout: 30000 since: (handle-sync datum)))
         ((input) (handle-input datum) (defer 'input get-input))
+        ((resize) (resize-terminal))
          ))
       )
   (main-loop)
@@ -135,3 +138,20 @@
             (set! *notifications* (lset-adjoin eq? *notifications* room-id))
             (refresh-statuswin))))
   ))
+
+(define (resize-terminal)
+  (let ((rows+cols (ioctl-winsize tty-fileno)))
+    (set! rows (car rows+cols))
+    (set! cols (cadr rows+cols))
+    (resizeterm rows cols)
+    (wresize messageswin (- rows 2) cols)
+    (mvwin messageswin 0 0)
+    (wresize statuswin 1 cols)
+    (mvwin statuswin (- rows 2) 0)
+    (wresize inputwin 1 cols)
+    (mvwin inputwin (- rows 1) 0)
+    (refresh-messageswin)
+    (refresh-statuswin)
+    (refresh-inputwin)))
+
+(trace ioctl-winsize)

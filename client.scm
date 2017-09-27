@@ -176,7 +176,6 @@
   (set! messageswin (newwin (- rows 2) cols 0 0))
   (scrollok messageswin #t)
   (idlok messageswin #t)
-  (wmove messageswin (- rows 3) 0)
 
   (set! inputwin (newwin 1 cols (- rows 1) 0))
   (keypad inputwin #t)

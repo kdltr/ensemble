@@ -2,4 +2,4 @@
  (category net)
  (needs utf8 http-client rest-bind openssl intarweb gochan
         uri-common medea cjson vector-lib clojurian
-        sql-de-lite lru-cache))
+        sql-de-lite lru-cache ioctl))

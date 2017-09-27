@@ -103,9 +103,6 @@
   (buffer-remove! (sub1 cursor-pos))
   (move-cursor -1))
 
-(define-key KEY_RESIZE
-  (set!-values (rows cols) (getmaxyx (stdscr))))
-
 (define-key (KEY_LEFT #\x02) ;; C-b
   (move-cursor -1))
 

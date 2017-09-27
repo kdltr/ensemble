@@ -11,14 +11,14 @@
           substring=? substring-ci=? substring-index substring-index-ci)
   (except extras
           read-string write-string read-token)
-  ports files)
+  ports files posix)
 
 (use utf8 utf8-srfi-13 utf8-srfi-14 unicode-char-sets
      vector-lib clojurian-syntax uri-common openssl
      ncurses gochan miscmacros srfi-1 posix irregex
      srfi-18 intarweb (except medea read-json) cjson
      rest-bind uri-common (prefix http-client http:)
-     ensemble.utils sql-de-lite lru-cache)
+     ensemble.utils sql-de-lite lru-cache ioctl trace)
 
 (include "db.scm")
 (include "client.scm")
