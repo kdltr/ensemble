@@ -121,25 +121,39 @@ EOF
          (sexp->string id)))
 
 (define (room-timeline id #!key (limit -1) (offset 0))
-  (query fetch-rows-sexps
-         (sql db "SELECT events.content, states.content
-                  FROM branches
-                  INNER JOIN events ON branches.event = events.id
-                  INNER JOIN states ON events.context = states.id
-                  WHERE branches.id = ?
-                  ORDER BY branches.sequence_number DESC
-                  LIMIT ? OFFSET ?;")
-         (sexp->string id) limit offset))
+  (let ((tmp (query fetch-rows-sexps
+                    (sql db "SELECT events.content, events.context
+                         FROM branches
+                         INNER JOIN events ON branches.event = events.id
+                         WHERE branches.id = ?
+                         ORDER BY branches.sequence_number DESC
+                         LIMIT ? OFFSET ?;")
+                    (sexp->string id) limit offset)))
+    (map (lambda (l) (list (car l) (state-by-id (cadr l))))
+         tmp)))
 
-(define (room-context-and-id room-id)
-  (query fetch-row-sexps
-         (sql db "SELECT states.id, states.content
+(define *state-cache* (make-lru-cache 100 equal?))
+
+(define (state-by-id state-id)
+  (or (lru-cache-ref *state-cache* state-id)
+      (let ((state (state-ref state-id)))
+        (lru-cache-set! *state-cache* state-id state)
+        state)))
+
+(define (room-last-state-id room-id)
+  (query fetch-sexp
+         (sql db "SELECT events.context
                   FROM branches
                   INNER JOIN events ON branches.event = events.id
-                  INNER JOIN states ON events.context = states.id
                   WHERE branches.id = ?
                   ORDER BY branches.sequence_number DESC LIMIT 1;")
          (sexp->string room-id)))
+
+(define (room-last-state-id-and-state room-id)
+  (let ((state-id (room-last-state-id room-id)))
+    (list state-id (state-by-id state-id))))
+
+(define room-context-and-id room-last-state-id-and-state)
 
 (define (room-context room-id) (cadr (room-context-and-id room-id)))
 
