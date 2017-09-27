@@ -11,10 +11,9 @@
     (werase messageswin)
     (for-each
       (lambda (evt+ctx)
-        (wprintw messageswin "~A" (print-event (car evt+ctx) (cadr evt+ctx)))
         (let-values (((l c) (getyx messageswin)))
-          (unless (zero? c) (wprintw messageswin "~%"))
-        ))
+          (unless (zero? c) (wprintw messageswin "~%")))
+        (wprintw messageswin "~A" (print-event (car evt+ctx) (cadr evt+ctx))))
       (reverse timeline))))
 
 (define (room-display-name id)
