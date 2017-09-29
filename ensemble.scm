@@ -18,7 +18,7 @@
      ncurses gochan miscmacros srfi-1 posix irregex
      srfi-18 intarweb (except medea read-json) cjson
      rest-bind uri-common (prefix http-client http:)
-     ensemble.utils sql-de-lite lru-cache ioctl trace)
+     ensemble.utils sql-de-lite lru-cache ioctl)
 
 (include "db.scm")
 (include "client.scm")

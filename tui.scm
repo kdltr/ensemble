@@ -153,5 +153,3 @@
     (refresh-messageswin)
     (refresh-statuswin)
     (refresh-inputwin)))
-
-(trace ioctl-winsize)
