@@ -12,7 +12,7 @@
 
 (define (refresh-inputwin)
   (werase inputwin)
-  (waddnstr inputwin (buffer-window) (sub1 cols))
+  (waddstr* inputwin (buffer-window))
   (wmove inputwin 0 (cursor-position)))
 
 

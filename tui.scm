@@ -1,10 +1,14 @@
 (include "tui/input.scm")
 
+(define (waddstr* win str max-cols)
+  (handle-exceptions exn #t
+    (waddstr win str)))
+
 (define (refresh-statuswin)
   (let* ((notifs (map room-display-name *notifications*))
          (status (sprintf "Room: ~a | ~a" (room-display-name (current-room)) notifs)))
     (werase statuswin)
-    (waddnstr statuswin status (sub1 cols))))
+    (waddstr* statuswin status)))
 
 (define (refresh-messageswin)
   (let ((timeline (room-timeline (current-room) limit: rows)))
