@@ -38,20 +38,27 @@
 ;; ===============
 
 
+(define (ignored-state-event? evt)
+  (and (equal? "m.room.member" (mref '(type) evt))
+       (equal? "leave" (mref '(content membership) evt))))
+
 (define (update-context ctx evt)
   (if (mref '(state_key) evt)
-      (alist-update (cons (state-key evt)
-                          (string->symbol (mref '(type) evt)))
-                    (mref '(content) evt)
-                    ctx equal?)
+      (let ((key (cons (state-key evt)
+                       (string->symbol (mref '(type) evt)))))
+        (if (ignored-state-event? evt)
+            (alist-delete key ctx equal?)
+            (alist-update key (mref '(content) evt) ctx equal?)))
       ctx))
 
 (define (initial-context state)
   (vector-fold (lambda (i ctx evt)
-                 (cons (cons (cons (state-key evt)
-                                   (string->symbol (mref '(type) evt)))
-                             (mref '(content) evt))
-                       ctx))
+                 (if (ignored-state-event? evt)
+                     ctx
+                     (cons (cons (cons (state-key evt)
+                                       (string->symbol (mref '(type) evt)))
+                                 (mref '(content) evt))
+                           ctx)))
                '() state))
 
 (define (state-key evt)
