@@ -28,7 +28,7 @@
              (vector-ref v 0))
         (and-let* ((members (room-members ctx))
                    (check (= (length members) 2))
-                   (others (remove (lambda (p) (equal? (caar p) (mxid))) members)))
+                   (others (remove (lambda (p) (equal? (caar p) (string-downcase (mxid)))) members)))
              (or (member-displayname (caaar others) ctx)
                  (caaar others)))
         (symbol->string id))))
