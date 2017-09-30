@@ -1,6 +1,6 @@
 (include "tui/input.scm")
 
-(define (waddstr* win str max-cols)
+(define (waddstr* win str)
   (handle-exceptions exn #t
     (waddstr win str)))
 
