@@ -72,16 +72,20 @@
   (char-set-complement char-set:white-space))
 
 (define (find-word-left str pos)
-  (if (char-set-contains? char-set:white-space (string-ref str pos))
-      (let ((skipped (string-index-right str char-set:non-white 0 pos)))
-        (if skipped (find-word-left str skipped) 0))
-      (add1 (or (string-skip-right str char-set:non-white 0 pos) -1))))
+  (cond ((zero? (string-length str)) 0)
+        ((char-set-contains? char-set:white-space (string-ref str pos))
+         (let ((skipped (string-index-right str char-set:non-white 0 pos)))
+           (if skipped (find-word-left str skipped) 0)))
+        (else
+          (add1 (or (string-skip-right str char-set:non-white 0 pos) -1)))))
 
 (define (find-word-right str pos)
-  (if (char-set-contains? char-set:white-space (string-ref str pos))
-      (let ((skipped (string-index str char-set:non-white pos)))
-        (if skipped (find-word-right str skipped) (sub1 (string-length str))))
-      (sub1 (or (string-skip str char-set:non-white pos) (string-length str)))))
+  (cond ((zero? (string-length str)) 0)
+        ((char-set-contains? char-set:white-space (string-ref str pos))
+         (let ((skipped (string-index str char-set:non-white pos)))
+           (if skipped (find-word-right str skipped) (sub1 (string-length str)))))
+        (else
+          (sub1 (or (string-skip str char-set:non-white pos) (string-length str))))))
 
 
 
