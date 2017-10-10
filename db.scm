@@ -1,6 +1,6 @@
 (void)
 
-(define +database-version+ 1)
+(define +database-version+ 2)
 
 (define db-file
   (make-pathname (or (get-environment-variable "XDG_CONFIG_HOME")
@@ -39,10 +39,20 @@ EOF
 
 (define init-branches-stmts (sql db #<<EOF
 CREATE TABLE branches(
+    id TEXT PRIMARY KEY NOT NULL,
+    last_state TEXT NOT NULL,
+    FOREIGN KEY(last_state) REFERENCES states(id)
+);
+EOF
+))
+
+(define init-branches_events-stmts (sql db #<<EOF
+CREATE TABLE branches_events(
     sequence_number INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL,
-    id TEXT NOT NULL,
-    event TEXT NOT NULL,
-    FOREIGN KEY(event) REFERENCES events(id)
+    branch_id TEXT NOT NULL,
+    event_id TEXT NOT NULL,
+    FOREIGN KEY(branch_id) REFERENCES branches(id),
+    FOREIGN KEY(event_id) REFERENCES events(id)
 );
 EOF
 ))
@@ -50,7 +60,9 @@ EOF
 (define (initialize-db)
   (exec init-states-stmts)
   (exec init-events-stmts)
-  (exec init-branches-stmts))
+  (exec init-branches-stmts)
+  (exec init-branches_events-stmts)
+  (config-set! 'database-version +database-version+))
 
 (define (sexp->string sexp)
   (with-output-to-string (lambda () (write sexp))))
@@ -94,6 +106,15 @@ EOF
   (exec (sql db "INSERT OR REPLACE INTO states (id, content) VALUES (?, ?);")
         (sexp->string id) (sexp->string content)))
 
+(define (last-state-ref room-id)
+  (query fetch-sexp
+         (sql db "SELECT last_state FROM branches WHERE id = ?;")
+         (sexp->string room-id)))
+
+(define (last-state-set! room-id state-id)
+  (exec (sql db "INSERT OR REPLACE INTO branches (id, last_state) VALUES (?, ?);")
+        (sexp->string room-id) (sexp->string state-id)))
+
 #;(define (event-ref id)
   (query fetch-sexps
          (sql db "SELECT content, context FROM events WHERE id = ?;")
@@ -104,12 +125,12 @@ EOF
         (sexp->string id) (sexp->string content) (sexp->string context-id)))
 
 (define (branch-insert! room-id event-id)
-  (exec (sql db "INSERT INTO branches (id, event) VALUES (?, ?);")
+  (exec (sql db "INSERT INTO branches_events (branch_id, event_id) VALUES (?, ?);")
         (sexp->string room-id) (sexp->string event-id)))
 
 (define (joined-rooms)
   (query fetch-column-sexps
-         (sql db "SELECT id FROM branches WHERE id LIKE '!%' GROUP BY id;")))
+         (sql db "SELECT id FROM branches WHERE id LIKE '!%';")))
 
 (define (any-room)
   (query fetch-sexp
@@ -123,10 +144,10 @@ EOF
 (define (room-timeline id #!key (limit -1) (offset 0))
   (let ((tmp (query fetch-rows-sexps
                     (sql db "SELECT events.content, events.context
-                         FROM branches
-                         INNER JOIN events ON branches.event = events.id
-                         WHERE branches.id = ?
-                         ORDER BY branches.sequence_number DESC
+                         FROM branches_events
+                         INNER JOIN events ON branches_events.event_id = events.id
+                         WHERE branches_events.branch_id = ?
+                         ORDER BY branches_events.sequence_number DESC
                          LIMIT ? OFFSET ?;")
                     (sexp->string id) limit offset)))
     (map (lambda (l) (list (car l) (state-by-id (cadr l))))
@@ -140,17 +161,8 @@ EOF
         (lru-cache-set! *state-cache* state-id state)
         state)))
 
-(define (room-last-state-id room-id)
-  (query fetch-sexp
-         (sql db "SELECT events.context
-                  FROM branches
-                  INNER JOIN events ON branches.event = events.id
-                  WHERE branches.id = ?
-                  ORDER BY branches.sequence_number DESC LIMIT 1;")
-         (sexp->string room-id)))
-
 (define (room-last-state-id-and-state room-id)
-  (let ((state-id (room-last-state-id room-id)))
+  (let ((state-id (last-state-ref room-id)))
     (list state-id (state-by-id state-id))))
 
 (define room-context-and-id room-last-state-id-and-state)
@@ -159,11 +171,12 @@ EOF
 
 (handle-exceptions exn
   (begin
-    (initialize-db)
     (exec init-config-stmts)
-    (config-set! 'database-version +database-version+))
+    (initialize-db))
   (when (not (= +database-version+ (config-ref 'database-version)))
     (exec (sql db "DROP TABLE IF EXISTS events;"))
     (exec (sql db "DROP TABLE IF EXISTS states;"))
     (exec (sql db "DROP TABLE IF EXISTS branches;"))
+    (exec (sql db "DROP TABLE IF EXISTS branches_events;"))
+    (exec (sql db "DELETE FROM config WHERE key = 'next-batch';"))
     (initialize-db)))
