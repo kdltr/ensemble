@@ -48,9 +48,11 @@ EOF
 
 (define init-branches_events-stmts (sql db #<<EOF
 CREATE TABLE branches_events(
-    sequence_number INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL,
+    id INTEGER PRIMARY KEY ASC AUTOINCREMENT NOT NULL,
     branch_id TEXT NOT NULL,
+    sequence_number REAL NOT NULL,
     event_id TEXT NOT NULL,
+    UNIQUE(branch_id, sequence_number),
     FOREIGN KEY(branch_id) REFERENCES branches(id),
     FOREIGN KEY(event_id) REFERENCES events(id)
 );
@@ -124,17 +126,23 @@ EOF
   (exec (sql db "INSERT OR REPLACE INTO events (id, content, context) VALUES (?, ?, ?);")
         (sexp->string id) (sexp->string content) (sexp->string context-id)))
 
-(define (branch-insert! room-id event-id)
-  (exec (sql db "INSERT INTO branches_events (branch_id, event_id) VALUES (?, ?);")
-        (sexp->string room-id) (sexp->string event-id)))
+(define (branch-insert! room-id sequence-number event-id)
+  (exec (sql db "INSERT INTO branches_events (branch_id, sequence_number, event_id) VALUES (?, ?, ?);")
+        (sexp->string room-id) (sexp->string sequence-number) (sexp->string event-id)))
+
+(define (branch-last-sequence-number branch-id)
+  (or (query fetch-value
+             (sql db "SELECT sequence_number FROM branches_events WHERE branch_id = ? ORDER BY sequence_number DESC;")
+             (sexp->string branch-id))
+      0))
 
 (define (joined-rooms)
   (query fetch-column-sexps
-         (sql db "SELECT id FROM branches WHERE id LIKE '!%';")))
+         (sql db "SELECT id FROM branches;")))
 
 (define (any-room)
   (query fetch-sexp
-         (sql db "SELECT id FROM branches WHERE id LIKE '!%' LIMIT 1;")))
+         (sql db "SELECT id FROM branches LIMIT 1;")))
 
 (define (room-exists? id)
   (query fetch-sexp
