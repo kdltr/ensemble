@@ -18,7 +18,8 @@
      ncurses gochan miscmacros srfi-1 posix irregex
      srfi-18 intarweb (except medea read-json) cjson
      rest-bind uri-common (prefix http-client http:)
-     ensemble.utils (except sql-de-lite reset) lru-cache ioctl)
+     ensemble.utils (except sql-de-lite reset) lru-cache
+     ioctl)
 
 (include "db.scm")
 (include "client.scm")
@@ -26,21 +27,21 @@
 
 
 (module main ()
-(import scheme (except chicken reset) extras client-mod (only ncurses endwin))
-(use (only uri-common uri->string))
+(import scheme chicken extras client-mod)
+(use (only uri-common uri->string)
+     (only ncurses endwin)
+     stty)
 
 (cond-expand
       (csi (enable-warnings #t))
       (else (enable-warnings #f)))
 
-(define (conceal) (display "\x1b[8m") (flush-output))
-(define (reset) (display "\x1b[0m") (flush-output))
-
 (define (prompt msg #!optional (passwd #f))
   (display msg)
   (flush-output)
   (if passwd
-      (dynamic-wind conceal read-line reset)
+      (with-stty '(not echo)
+        (lambda () (read-line)))
       (read-line)))
 
 (define (prompt-credentials)
