@@ -71,6 +71,7 @@
                        (mref '(event_id)
                              (vector-ref events (sub1 (vector-length events)))))))
     (state-set! state-id state)
+    (last-state-set! room-id state-id)
     (list state-id state)))
 
 (define (startup)
@@ -126,6 +127,7 @@
 
 (define (advance-room room-data #!optional (update-ui #t))
   (let* ((room-id (car room-data))
+         (limited (mref '(timeline limited) (cdr room-data)))
          (events (mref '(timeline events) (cdr room-data)))
          (state (mref '(state events) (cdr room-data)))
          (base-sequence (add1 (branch-last-sequence-number room-id)))
@@ -141,6 +143,17 @@
                           (room-last-state-id-and-state room-id))
                          (else
                            (initialize-room! room-data)))))
+    (when limited
+      (fprintf (current-error-port) "======= LIMITED~%")
+      (let ((evt-id (sprintf "hole-~A-~A" room-id base-sequence)))
+        (event-set! evt-id
+                    `((type . "com.upyum.ensemble.hole")
+                      (content (from . ,(mref '(timeline prev_batch) (cdr room-data)))))
+                    (car init-ctx))
+        (fprintf (current-error-port) "room: ~A seq: ~A evt: ~A~%" room-id base-sequence evt-id)
+        (branch-insert! room-id base-sequence evt-id)
+        (fprintf (current-error-port) "success…~%~%")
+        (set! base-sequence (add1 base-sequence))))
     (vector-for-each (lambda (i evt)
                        (let* ((id+old-ctx init-ctx)
                               (prev-ctx-id (car id+old-ctx))

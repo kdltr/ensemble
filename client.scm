@@ -149,10 +149,14 @@
                                                 "nothing")))))
            (sprintf "*** ~A joined the room" displayed-name))))))
 
+(define (com.upyum.ensemble.hole-printer evt ctx)
+  (sprintf "...~%Some history excluded~%...")
+  )
+
 (define event-printers
   `((m.room.message . ,m.room.message-printer)
     (m.room.member . ,m.room.member-printer)
-    ))
+    (com.upyum.ensemble.hole . ,com.upyum.ensemble.hole-printer)))
 
 
 ;; Takes a contextualized event and gives a string representation of it
