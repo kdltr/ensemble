@@ -152,7 +152,6 @@
                     (car init-ctx))
         (fprintf (current-error-port) "room: ~A seq: ~A evt: ~A~%" room-id base-sequence evt-id)
         (branch-insert! room-id base-sequence evt-id)
-        (fprintf (current-error-port) "success…~%~%")
         (set! base-sequence (add1 base-sequence))))
     (vector-for-each (lambda (i evt)
                        (let* ((id+old-ctx init-ctx)

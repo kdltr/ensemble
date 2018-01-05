@@ -117,8 +117,8 @@ EOF
   (exec (sql db "INSERT OR REPLACE INTO branches (id, last_state) VALUES (?, ?);")
         (sexp->string room-id) (sexp->string state-id)))
 
-#;(define (event-ref id)
-  (query fetch-sexps
+(define (event-ref id)
+  (query fetch-row-sexps
          (sql db "SELECT content, context FROM events WHERE id = ?;")
          (sexp->string id)))
 
