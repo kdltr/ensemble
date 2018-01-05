@@ -98,15 +98,22 @@
          (name (or (member-displayname sender ctx)
                    sender))
          (type (mref '(content msgtype) evt))
-         (body (mref '(content body) evt)))
+         (body (mref '(content body) evt))
+         (timestamp (mref '(origin_server_ts) evt))
+         (time (if timestamp
+                   (time->string
+                     (seconds->local-time (/ timestamp 1000))
+                     "%d/%m %H:%M")
+                   "unknown")))
     (if body
         (case (string->symbol type)
-          ((m.emote) (sprintf "* ~a ~a" name body))
+          ((m.emote) (sprintf "[~a] * ~a ~a" time name body))
           ((m.image m.file m.video m.audio)
-           (sprintf "*** ~a uploaded ~a: ~a" name body (or (mxc->url (mref '(content url) evt))
-                                                           "[invalid uri]")))
-          (else (sprintf "<~a> ~a" name body)))
-        (sprintf "<~a> [redacted]" name))
+           (sprintf "[~a] *** ~a uploaded ~a: ~a" time name body
+                    (or (mxc->url (mref '(content url) evt))
+                        "[invalid uri]")))
+          (else (sprintf "[~a] <~a> ~a" time name body)))
+        (sprintf "[~a] <~a> [redacted]" time name))
         ))
 
 ;; TODO fix this mess up
