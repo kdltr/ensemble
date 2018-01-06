@@ -171,6 +171,9 @@
         (substring input-string 0 cursor-pos)
         (substring input-string (add1 (find-word-right input-string cursor-pos)))))))
 
+(define-key #(#\escape #\n)
+  (unless (null? *notifications*)
+    (switch-room (car *notifications*))))
 
 
 ;; Commands
