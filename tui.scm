@@ -211,7 +211,7 @@
       (refresh-messageswin))
     (when (and notifs (> notifs 0) (not (eq? (current-room) room-id)))
       (set! *notifications* (lset-adjoin eq? *notifications* room-id))
-      (refresh-statuswin))
+      (when update-ui (refresh-statuswin)))
   ))
 
 (define (resize-terminal)
