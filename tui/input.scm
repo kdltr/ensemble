@@ -111,13 +111,13 @@
 (define-key (KEY_RIGHT #\x06) ;; C-f
   (move-cursor 1))
 
-(define-key #\x01 ;; C-a
+(define-key (KEY_HOME #\x01) ;; C-a
   (move-cursor 'left))
 
 (define-key #\x04 ;; C-d
   (buffer-remove! cursor-pos))
 
-(define-key #\x05 ;; C-e
+(define-key (KEY_END #\x05) ;; C-e
   (move-cursor 'right))
 
 (define-key #\x0B ;; C-k
@@ -143,8 +143,7 @@
         ;; Any code for the ESC key alone here:
         (void))))
 
-
-(define-key #(#\escape #\b)
+(define (move-left-word)
   (define (left)
     (find-word-left input-string (min (sub1 (string-length input-string))
                                       cursor-pos)))
@@ -153,6 +152,9 @@
         (begin (move-cursor -1)
                (move-cursor (- (left) cursor-pos)))
         (move-cursor (- new-pos cursor-pos)))))
+
+(define-key #(#\escape #\b)
+  (move-left-word))
 
 (define-key #(#\escape #\f)
   (define (right)
@@ -164,12 +166,22 @@
                (move-cursor (- (right) cursor-pos)))
         (move-cursor (add1 (- new-pos cursor-pos))))))
 
-(define-key #(#\escape #\d)
+(define (delete-word-right)
   (unless (= cursor-pos (string-length input-string))
     (set! input-string
       (string-append
         (substring input-string 0 cursor-pos)
         (substring input-string (add1 (find-word-right input-string cursor-pos)))))))
+
+(define-key #(#\escape #\d)
+  (delete-word-right))
+
+(define-key #\x17 ;; C-w
+  (let* ((old-pos cursor-pos)
+         (_ (move-left-word))
+         (new-pos cursor-pos))
+    (unless (= old-pos new-pos)
+      (delete-word-right))))
 
 (define-key #(#\escape #\n)
   (unless (null? *notifications*)
