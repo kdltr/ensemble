@@ -11,14 +11,21 @@
     (waddstr* statuswin status)))
 
 (define (refresh-messageswin)
-  (let ((timeline (room-timeline (current-room) limit: rows)))
+  (let ((timeline (room-timeline (current-room) limit: rows))
+        (read-marker (read-marker-ref (current-room))))
     (werase messageswin)
     (for-each
       (lambda (evt+ctx)
-        (let-values (((l c) (getyx messageswin)))
-          (unless (zero? c) (wprintw messageswin "~%")))
-        (wprintw messageswin "~A" (print-event (car evt+ctx) (cadr evt+ctx))))
+        (maybe-newline)
+        (wprintw messageswin "~A" (print-event (car evt+ctx) (cadr evt+ctx)))
+        (when (and read-marker (equal? read-marker (mref '(event_id) (car evt+ctx))))
+          (maybe-newline)
+          (wprintw messageswin "~A" (make-string cols #\-))))
       (reverse timeline))))
+
+(define (maybe-newline)
+  (let-values (((l c) (getyx messageswin)))
+    (unless (zero? c) (wprintw messageswin "~%"))))
 
 (define (room-display-name id)
   (let ((ctx (room-context id)))
@@ -62,6 +69,15 @@
                           (searched-string (room-context room-id))))
         (joined-rooms)))
 
+(define (mark-last-message-as-read)
+  (let* ((last-evt (caar (room-timeline (current-room) limit: 1)))
+         (id (mref '(event_id) last-evt)))
+    (when id
+      (defer (symbol-append 'receipt- (current-room))
+             room-mark-read
+             (current-room)
+             id))))
+
 (define (initialize-room! room-data)
   (let* ((room-id (car room-data))
          (events (mref '(state events) (cdr room-data)))
@@ -99,6 +115,7 @@
         ((sync) (defer 'sync sync timeout: 30000 since: (handle-sync datum)))
         ((input) (handle-input datum) (defer 'input get-input))
         ((resize) (resize-terminal))
+        (else  (info "Unknown defered procedure: ~a~%" who datum))
          ))
       )
   (main-loop)
@@ -127,9 +144,13 @@
 
 (define (advance-room room-data #!optional (update-ui #t))
   (let* ((room-id (car room-data))
+         (window-dirty #f)
          (limited (mref '(timeline limited) (cdr room-data)))
          (events (mref '(timeline events) (cdr room-data)))
+         (ephemerals (mref '(ephemeral events) (cdr room-data)))
          (state (mref '(state events) (cdr room-data)))
+         (notifs (mref '(unread_notifications notification_count) (cdr room-data)))
+         (highlights (mref '(unread_notifications highlight_count) (cdr room-data)))
          (base-sequence (add1 (branch-last-sequence-number room-id)))
          (init-ctx (cond ((and (room-exists? room-id) (vector? state) (not (vector-empty? state)))
                           (let ((id (mref '(event_id)
@@ -143,6 +164,7 @@
                           (room-last-state-id-and-state room-id))
                          (else
                            (initialize-room! room-data)))))
+    ;; Timeline Hole
     (when limited
       (fprintf (current-error-port) "======= LIMITED~%")
       (let ((evt-id (sprintf "hole-~A-~A" room-id base-sequence)))
@@ -153,6 +175,7 @@
         (fprintf (current-error-port) "room: ~A seq: ~A evt: ~A~%" room-id base-sequence evt-id)
         (branch-insert! room-id base-sequence evt-id)
         (set! base-sequence (add1 base-sequence))))
+    ;; Timeline
     (vector-for-each (lambda (i evt)
                        (let* ((id+old-ctx init-ctx)
                               (prev-ctx-id (car id+old-ctx))
@@ -167,14 +190,31 @@
                          (branch-insert! room-id
                                          (+ base-sequence i)
                                          evt-id)
+                         (set! window-dirty #t)
                          ))
                      events)
-    (when (and update-ui (not (vector-empty? events)))
-      (if (eq? (current-room) room-id)
-          (refresh-messageswin)
-          (begin
-            (set! *notifications* (lset-adjoin eq? *notifications* room-id))
-            (refresh-statuswin))))
+    ;; Ephemerals
+    (vector-for-each (lambda (i evt)
+                       (when (equal? (mref '(type) evt) "m.receipt")
+                         (let ((datum (mref '(content) evt)))
+                           (for-each (lambda (id+reads)
+                                       (when (member (string-downcase (mxid))
+                                                     (map (o string-downcase symbol->string car)
+                                                       (mref '(m.read) (cdr id+reads))))
+                                         (info "[marker] id+reads: ~s~%" id+reads)
+                                         (read-marker-set! room-id (car id+reads))
+                                         (set! window-dirty #t)))
+                             datum)
+                           )))
+                     ephemerals)
+    (when (and update-ui window-dirty (eq? (current-room) room-id))
+      (refresh-messageswin))
+    #;(when (and highlights (> highlights 0))
+      (set! *highlights* (lset-adjoin eq? *highlights* room-id))
+      (refresh-statuswin))
+    (when (and notifs (> notifs 0))
+      (set! *notifications* (lset-adjoin eq? *notifications* room-id))
+      (refresh-statuswin))
   ))
 
 (define (resize-terminal)

@@ -1,6 +1,6 @@
 (void)
 
-(define +database-version+ 2)
+(define +database-version+ 3)
 
 (define db-file
   (make-pathname (or (get-environment-variable "XDG_CONFIG_HOME")
@@ -41,6 +41,7 @@ EOF
 CREATE TABLE branches(
     id TEXT PRIMARY KEY NOT NULL,
     last_state TEXT NOT NULL,
+    read_marker TEXT,
     FOREIGN KEY(last_state) REFERENCES states(id)
 );
 EOF
@@ -74,7 +75,7 @@ EOF
 
 (define (fetch-sexp o)
   (let ((v (fetch-value o)))
-    (and v (string->sexp v))))
+    (and v (not (null? v)) (string->sexp v))))
 
 (define (fetch-column-sexps o)
   (map! string->sexp (fetch-column o)))
@@ -114,8 +115,17 @@ EOF
          (sexp->string room-id)))
 
 (define (last-state-set! room-id state-id)
-  (exec (sql db "INSERT OR REPLACE INTO branches (id, last_state) VALUES (?, ?);")
-        (sexp->string room-id) (sexp->string state-id)))
+  (exec (sql db "INSERT OR REPLACE INTO branches (id, last_state, read_marker) VALUES (?, ?, ?);")
+        (sexp->string room-id) (sexp->string state-id) (sexp->string (read-marker-ref room-id))))
+
+(define (read-marker-ref room-id)
+  (query fetch-sexp
+         (sql db "SELECT read_marker FROM branches WHERE id = ?;")
+         (sexp->string room-id)))
+
+(define (read-marker-set! room-id event-id)
+  (exec (sql db "UPDATE branches SET read_marker = ? WHERE id = ?;")
+        (sexp->string (->string event-id)) (sexp->string room-id)))
 
 (define (event-ref id)
   (query fetch-row-sexps
@@ -182,9 +192,10 @@ EOF
     (exec init-config-stmts)
     (initialize-db))
   (when (not (= +database-version+ (config-ref 'database-version)))
+    (print "Database outdated, refreshing…")
+    (exec (sql db "DROP TABLE IF EXISTS branches_events;"))
+    (exec (sql db "DROP TABLE IF EXISTS branches;"))
     (exec (sql db "DROP TABLE IF EXISTS events;"))
     (exec (sql db "DROP TABLE IF EXISTS states;"))
-    (exec (sql db "DROP TABLE IF EXISTS branches;"))
-    (exec (sql db "DROP TABLE IF EXISTS branches_events;"))
     (exec (sql db "DELETE FROM config WHERE key = 'next-batch';"))
     (initialize-db)))

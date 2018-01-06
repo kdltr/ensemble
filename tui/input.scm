@@ -87,8 +87,6 @@
         (else
           (sub1 (or (string-skip str char-set:non-white pos) (string-length str))))))
 
-
-
 ;; Key bindings
 ;; ============
 
@@ -126,12 +124,14 @@
   (buffer-kill!))
 
 (define-key #\newline
-  (unless (equal? input-string "")
-    (if (char=? (string-ref input-string 0) #\/)
-        (handle-command input-string)
-        (defer 'message message:text (current-room) input-string))
-    (set! input-string "")
-    (move-cursor 'left)))
+  (cond ((string=? "" input-string)
+         (mark-last-message-as-read))
+        ((char=? (string-ref input-string 0) #\/)
+         (handle-command input-string))
+        (else
+          (defer 'message message:text (current-room) input-string)))
+  (set! input-string "")
+  (move-cursor 'left))
 
 (define-key #\escape
   (wtimeout inputwin 0)

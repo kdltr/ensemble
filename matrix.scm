@@ -71,3 +71,5 @@
              `((msgtype . "m.emote")
                (body . ,text))))
 
+(define (room-mark-read room evt)
+  (room-receipt room 'm.read evt '()))

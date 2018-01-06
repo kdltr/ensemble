@@ -153,7 +153,8 @@
                     (sprintf "*** ~A changed its avatar to ~A"
                              displayed-name (if maybe-avatar
                                                 (mxc->url maybe-avatar)
-                                                "nothing")))))
+                                                "nothing")))
+                   (else "")))
            (sprintf "*** ~A joined the room" displayed-name))))))
 
 (define (com.upyum.ensemble.hole-printer evt ctx)
@@ -170,9 +171,12 @@
 (define (print-event evt ctx)
   (let* ((type (string->symbol (mref '(type) evt)))
          (content (mref '(content) evt))
-         (printer (alist-ref type event-printers)))
-    (if printer
-        (printer evt ctx)
+         (printer (alist-ref type event-printers))
+         (str (and printer (printer evt ctx))))
+    (if str
+        (if (eq? (void) str)
+            (sprintf "##### BUG in printer for ~a~%EVT: ~s~%CTX: ~s" type evt ctx)
+            str)
         (sprintf "No event printer for ~a: ~s" type content))))
 
 
