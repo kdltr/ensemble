@@ -166,13 +166,13 @@
                            (initialize-room! room-data)))))
     ;; Timeline Hole
     (when limited
-      (fprintf (current-error-port) "======= LIMITED~%")
+      (info "======= LIMITED~%")
       (let ((evt-id (sprintf "hole-~A-~A" room-id base-sequence)))
         (event-set! evt-id
                     `((type . "com.upyum.ensemble.hole")
                       (content (from . ,(mref '(timeline prev_batch) (cdr room-data)))))
                     (car init-ctx))
-        (fprintf (current-error-port) "room: ~A seq: ~A evt: ~A~%" room-id base-sequence evt-id)
+        (info "room: ~A seq: ~A evt: ~A~%" room-id base-sequence evt-id)
         (branch-insert! room-id base-sequence evt-id)
         (set! base-sequence (add1 base-sequence))))
     ;; Timeline
