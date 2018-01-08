@@ -5,7 +5,7 @@
 
 (foreign-declare "#include <wchar.h>")
 (foreign-declare "#include <locale.h>")
-(foreign-code "setlocale(LC_ALL, \"\");")
+(foreign-code "setlocale(LC_ALL, \"C.UTF-8\");")
 
 (define (string-width str)
   (fold (lambda (c rest) (+ rest (char-width c))) 0 (string->list str)))
