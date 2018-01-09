@@ -184,8 +184,10 @@
       (delete-word-right))))
 
 (define-key #(#\escape #\n)
-  (unless (null? *notifications*)
-    (switch-room (car *notifications*))))
+  (cond ((not (null? *highlights*))
+         (switch-room (car *highlights*)))
+        ((not (null? *notifications*))
+         (switch-room (car *notifications*)))))
 
 
 ;; Commands

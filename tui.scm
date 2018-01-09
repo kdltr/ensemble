@@ -5,10 +5,15 @@
     (waddstr win str)))
 
 (define (refresh-statuswin)
-  (let* ((notifs (map room-display-name *notifications*))
-         (status (sprintf "Room: ~a | ~a" (room-display-name (current-room)) notifs)))
+  (let* ((regular-notifs (lset-difference eq? *notifications* *highlights*))
+         (highlights-names (map room-display-name *highlights*))
+         (notifs-names (map room-display-name regular-notifs)))
     (werase statuswin)
-    (waddstr* statuswin status)))
+    (waddstr* statuswin (sprintf "Room: ~a | " (room-display-name (current-room))))
+    (wcolor_set statuswin 2 #f) ;; highlight foreground
+    (waddstr* statuswin (sprintf "~a" (string-join highlights-names " " 'suffix)))
+    (wcolor_set statuswin 1 #f) ;; regular foreground
+    (waddstr* statuswin (sprintf "~a" (string-join notifs-names " ")))))
 
 (define (refresh-messageswin)
   (let ((timeline (room-timeline (current-room) limit: rows))
@@ -46,6 +51,7 @@
         (begin
           (current-room room-id)
           (set! *notifications* (delete! room-id *notifications* eq?))
+          (set! *highlights* (delete! room-id *highlights* eq?))
           (refresh-statuswin)
           (refresh-messageswin)
           )
@@ -209,6 +215,9 @@
                      ephemerals)
     (when (and update-ui window-dirty (eq? (current-room) room-id))
       (refresh-messageswin))
+    (when (and highlights (> highlights 0) (not (eq? (current-room) room-id)))
+      (set! *highlights* (lset-adjoin eq? *highlights* room-id))
+      (when update-ui (refresh-statuswin) (beep)))
     (when (and notifs (> notifs 0) (not (eq? (current-room) room-id)))
       (set! *notifications* (lset-adjoin eq? *notifications* room-id))
       (when update-ui (refresh-statuswin)))

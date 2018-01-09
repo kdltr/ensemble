@@ -203,6 +203,7 @@
   (keypad inputwin #t)
   (set! statuswin (newwin 1 cols (- rows 2) 0))
   (init_pair 1 COLOR_BLACK COLOR_WHITE)
+  (init_pair 2 COLOR_RED COLOR_WHITE)
   (wbkgdset statuswin (COLOR_PAIR 1))
   )
 
@@ -211,5 +212,6 @@
 (define ui-chan (gochan 0))
 
 (define *notifications* '())
+(define *highlights* '())
 
 (include "tui.scm")
