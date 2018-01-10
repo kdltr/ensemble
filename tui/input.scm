@@ -127,10 +127,9 @@
                                       (string-downcase (caar o))))
                             (room-members (room-context (current-room)))))
            (members-names (map (lambda (o)
-                                 (let ((maybe-displayname (json-true? (mref '(displayname) o))))
-                                   (if maybe-displayname maybe-displayname (caar o))))
+                                 (or (json-true? (mref '(displayname) o)) (caar o)))
                             members))
-           (prefix (substring input-string 0 (min cursor-pos (string-length input-string))))
+           (prefix (substring input-string 0 cursor-pos))
            (candidate (find (cut string-prefix? prefix <>) members-names)))
       (when candidate
         (when (string-suffix? " (IRC)" candidate) ;; Ugh, kill me now
