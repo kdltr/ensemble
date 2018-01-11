@@ -79,10 +79,7 @@
   (let* ((last-evt (caar (room-timeline (current-room) limit: 1)))
          (id (mref '(event_id) last-evt)))
     (when id
-      (defer (symbol-append 'receipt- (current-room))
-             room-mark-read
-             (current-room)
-             id))))
+      (room-mark-read (current-room) id))))
 
 (define (initialize-room! room-data)
   (let* ((room-id (car room-data))
@@ -116,7 +113,7 @@
   (wnoutrefresh inputwin)
   (doupdate)
   (let ((th (gochan-recv ui-chan)))
-    (receive (who datum) (thread-join! th)
+    (receive (who datum) (thread-join-protected! th)
       (case who
         ((sync) (defer 'sync sync timeout: 30000 since: (handle-sync datum)))
         ((input) (handle-input datum) (defer 'input get-input))
@@ -124,25 +121,24 @@
         (else  (info "Unknown defered procedure: ~a~%" who datum))
          ))
       )
-  (main-loop)
-  )
+  (main-loop))
+
+(define (thread-join-protected! thread)
+  (receive data (handle-exceptions exn exn (thread-join! thread))
+    (if (uncaught-exception? (car data))
+        (condition-case (signal (uncaught-exception-reason (car data)))
+          (exn (exn i/o net)  (retry exn) (values 'no-one #f))
+          (exn (exn http server-error)  (retry exn) (values 'no-one #f)))
+        (apply values data))))
 
 (define (handle-sync batch #!optional (update-ui #t))
   (let ((next (mref '(next_batch) batch)))
-    (info "[~A] update~%" (seconds->string))
+    (info "[~A] update: ~a~%" (seconds->string) next)
     (with-transaction db
       (lambda ()
         (for-each (cut advance-room <> update-ui) (mref '(rooms join) batch))
         (config-set! 'next-batch next)))
     next))
-
-(define (defer id proc . args)
-  (thread-start! (lambda ()
-                   (let ((res (handle-exceptions exn exn (apply proc args))))
-                     (gochan-send ui-chan (current-thread))
-                     (if (condition? res)
-                         (signal (list id res))
-                         (values id res))))))
 
 (define (get-input)
   (thread-wait-for-i/o! tty-fileno #:input)

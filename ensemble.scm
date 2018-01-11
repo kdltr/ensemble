@@ -21,6 +21,8 @@
      ensemble.utils (except sql-de-lite reset) lru-cache
      ioctl)
 
+(define +ensemble-version+ "dev")
+
 (include "db.scm")
 (include "client.scm")
 )

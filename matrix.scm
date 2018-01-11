@@ -34,6 +34,33 @@
                     alist
                     equal?)))
 
+;; Defering API
+;; ============
+
+(define (defer id proc . args)
+  (unless (eq? id 'input) (info "[defer] ~s ~s ~s~%" id proc args))
+  (thread-start!
+    (lambda ()
+      (let ((res (handle-exceptions exn exn (apply proc args))))
+        (gochan-send ui-chan (current-thread))
+        (if (condition? res)
+            (signal (make-composite-condition
+                      res
+                      (make-property-condition 'defered 'id id 'proc proc 'args args)))
+            (values id res))))))
+
+;; Retry a failed defered procedure
+(define (retry exn)
+  (let ((id (get-condition-property exn 'defered 'id #f))
+        (proc (get-condition-property exn 'defered 'proc #f))
+        (args (get-condition-property exn 'defered 'args #f)))
+    (if (and id proc args)
+        (begin
+          (info "[retry] retrying ~a~%" exn)
+          (defer id (lambda (args) (thread-sleep! 1) (apply proc args)) args))
+        (info "[retry] failed to retry: ~a~%" exn))))
+
+
 ;; High level API
 ;; ==============
 
@@ -58,18 +85,21 @@
 
 
 (define (message:text room text)
-  (room-send room
-             'm.room.message
-             (new-txnid)
-             `((msgtype . "m.text")
-               (body . ,text))))
+  (defer 'message
+    room-send room
+              'm.room.message
+              (new-txnid)
+              `((msgtype . "m.text")
+                (body . ,text))))
 
 (define (message:emote room text)
-  (room-send room
-             'm.room.message
-             (new-txnid)
-             `((msgtype . "m.emote")
-               (body . ,text))))
+  (defer 'message
+    room-send room
+              'm.room.message
+              (new-txnid)
+              `((msgtype . "m.emote")
+                (body . ,text))))
 
 (define (room-mark-read room evt)
-  (room-receipt room 'm.read evt '()))
+  (defer 'receipt
+    room-receipt room 'm.read evt '()))
