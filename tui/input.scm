@@ -208,6 +208,25 @@
         ((not (null? *notifications*))
          (switch-room (car *notifications*)))))
 
+;; History down
+(define-key KEY_NPAGE
+  (let* ((current-offset (room-offset (current-room)))
+         (next (events-next (current-room) current-offset (quotient rows 2))))
+    (unless (null? next)
+      (let ((new-offset (last next)))
+        (if (= new-offset (branch-last-sequence-number (current-room)))
+            (room-offset-delete! (current-room))
+            (room-offset-set! (current-room) new-offset))
+        (refresh-messageswin)))))
+
+;; History up
+(define-key KEY_PPAGE
+  (let* ((current-offset (room-offset (current-room)))
+         (prev (events-previous (current-room) current-offset (quotient rows 2))))
+    (unless (< (length prev) (quotient rows 2))
+      (room-offset-set! (current-room) (last prev))
+      (refresh-messageswin))))
+
 
 ;; Commands
 ;; ========

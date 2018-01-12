@@ -17,8 +17,23 @@
 
 (define *requested-holes* '())
 
+(define *rooms-offset* '())
+
+(define (room-offset room-id)
+  (alist-ref room-id *rooms-offset* equal? (branch-last-sequence-number room-id)))
+
+(define (room-offset-set! room-id offset)
+  (set! *rooms-offset*
+    (alist-update! room-id offset *rooms-offset* equal?)))
+
+(define (room-offset-delete! room-id)
+  (set! *rooms-offset*
+    (alist-delete! room-id *rooms-offset* equal?)))
+
 (define (refresh-messageswin)
-  (let ((timeline (room-timeline (current-room) limit: rows))
+  (let ((timeline (room-timeline (current-room)
+                                 limit: rows
+                                 offset: (room-offset (current-room))))
         (read-marker (read-marker-ref (current-room))))
     (werase messageswin)
     (for-each
