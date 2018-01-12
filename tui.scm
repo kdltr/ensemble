@@ -34,7 +34,7 @@
                        (not (zero? limit)))
               (set! *requested-holes* (cons hole *requested-holes*))
               (defer 'hole-messages request-hole-messages
-                     (current-room) (car evt+ctx) (caddr evt+ctx)
+                     (current-room) (cadddr evt+ctx) (car evt+ctx) (caddr evt+ctx)
                      limit hole))))
         (maybe-newline)
         (wprintw messageswin "~A" (print-event (car evt+ctx) (cadr evt+ctx)))
@@ -96,23 +96,41 @@
     (when id
       (room-mark-read (current-room) id))))
 
-(define (request-hole-messages room-id hole-evt hole-id limit hole)
+(define (request-hole-messages room-id hole-evt-id hole-evt hole-id limit hole)
   (let* ((msgs (room-messages room-id from: (mref '(content from) hole-evt) limit: limit dir: 'b)))
-    (list room-id hole-id msgs hole)))
+    (list room-id hole-evt-id hole-id msgs hole)))
 
-(define (fill-hole room-id hole-id msgs hole)
+(define (fill-hole room-id hole-evt-id hole-id msgs hole)
   (let* ((incoming-events (mref '(chunk) msgs))
-         (new-events (reverse! (filter-out-known-events! (vector->list incoming-events))))
+         (new-events (filter-out-known-events! (vector->list incoming-events)))
          (number (+ (length new-events) 2))
          (neighs (event-neighbors room-id hole-id))
          (incr (if (car neighs) (/ (- (caddr neighs) (car neighs)) number) 1))
          (start (if (car neighs) (+ (car neighs) incr) (- (caddr neighs) number)))
-         (ctx-id "empty-state")
+         (ctx-id (cadr (event-ref hole-evt-id)))
+         (ctx (state-by-id ctx-id))
          )
     (info "[fill-hole] ~a ~a ~s number: ~a start: ~a incr: ~a end: ~a~%"
           room-id hole-id neighs number start incr (+ start -1 (* number incr)))
     (with-transaction db
       (lambda ()
+        (branch-remove! hole-id)
+        (for-each
+          (lambda (i evt)
+            (let* ((evt-id (mref '(event_id) evt))
+                   (new-ctx (update-context ctx evt #t)))
+              (unless (equal? ctx new-ctx)
+                (state-set! evt-id new-ctx)
+                (set! ctx-id evt-id)
+                (set! ctx new-ctx))
+              (event-set! evt-id evt ctx-id)
+              (branch-insert! room-id
+                              (+ start (* i incr))
+                              evt-id)))
+          (iota (length new-events)
+                (length new-events)
+                -1)
+          new-events)
         ;; New hole
         (unless (null? new-events)
           (let ((evt-id (sprintf "hole-~A-~A" room-id start)))
@@ -121,18 +139,7 @@
                           (content (from . ,(mref '(end) msgs))))
                         ctx-id)
             (info "[new-hole] room: ~A seq: ~A evt: ~A~%" room-id start evt-id)
-            (branch-insert! room-id start evt-id)
-            (set! start (+ start incr))))
-        (branch-remove! hole-id)
-        (for-each
-          (lambda (i evt)
-            (let ((evt-id (mref '(event_id) evt)))
-              (event-set! evt-id evt ctx-id)
-              (branch-insert! room-id
-                              (+ start (* i incr))
-                              evt-id)))
-          (iota (length new-events))
-          new-events)))
+            (branch-insert! room-id start evt-id)))))
     (set! *requested-holes* (delete! hole *requested-holes*))
     (refresh-messageswin)))
 

@@ -166,14 +166,14 @@ EOF
 
 (define (room-timeline id #!key (limit -1) (offset 0))
   (let ((tmp (query fetch-rows-sexps
-                    (sql db "SELECT events.content, events.context, branches_events.id
+                    (sql db "SELECT events.content, events.context, branches_events.id, events.id
                          FROM branches_events
                          INNER JOIN events ON branches_events.event_id = events.id
                          WHERE branches_events.branch_id = ?
                          ORDER BY branches_events.sequence_number DESC
                          LIMIT ? OFFSET ?;")
                     (sexp->string id) limit offset)))
-    (map (lambda (l) (list (car l) (state-by-id (cadr l)) (caddr l)))
+    (map (lambda (l) (list (car l) (state-by-id (cadr l)) (caddr l) (cadddr l)))
          tmp)))
 
 (define (event-neighbors room-id event-branch-id)

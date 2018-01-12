@@ -42,13 +42,13 @@
   (and (equal? "m.room.member" (mref '(type) evt))
        (equal? "leave" (mref '(content membership) evt))))
 
-(define (update-context ctx evt)
+(define (update-context ctx evt #!optional (reverse #f))
   (if (mref '(state_key) evt)
       (let ((key (cons (state-key evt)
                        (string->symbol (mref '(type) evt)))))
         (if (ignored-state-event? evt)
             (alist-delete key ctx equal?)
-            (alist-update key (mref '(content) evt) ctx equal?)))
+            (alist-update key (mref (if reverse '(prev_content) '(content)) evt) ctx equal?)))
       ctx))
 
 (define (initial-context state)
