@@ -38,7 +38,7 @@
 ;; ============
 
 (define (defer id proc . args)
-  (unless (eq? id 'input) (info "[defer] ~s ~s ~s~%" id proc args))
+  (unless (memq id '(input sync)) (info "[defer] ~s ~s ~s~%" id proc args))
   (thread-start!
     (lambda ()
       (let ((res (handle-exceptions exn exn (apply proc args))))

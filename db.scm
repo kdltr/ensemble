@@ -71,7 +71,8 @@ EOF
   (with-output-to-string (lambda () (write sexp))))
 
 (define (string->sexp str)
-  (with-input-from-string str read))
+  (if (number? str) str ;; sqlite numerical ids
+      (with-input-from-string str read)))
 
 (define (fetch-sexp o)
   (let ((v (fetch-value o)))
@@ -140,6 +141,10 @@ EOF
   (exec (sql db "INSERT INTO branches_events (branch_id, sequence_number, event_id) VALUES (?, ?, ?);")
         (sexp->string room-id) (sexp->string sequence-number) (sexp->string event-id)))
 
+(define (branch-remove! id)
+  (exec (sql db "DELETE FROM branches_events WHERE id = ?;")
+        id))
+
 (define (branch-last-sequence-number branch-id)
   (or (query fetch-value
              (sql db "SELECT sequence_number FROM branches_events WHERE branch_id = ? ORDER BY sequence_number DESC;")
@@ -161,15 +166,27 @@ EOF
 
 (define (room-timeline id #!key (limit -1) (offset 0))
   (let ((tmp (query fetch-rows-sexps
-                    (sql db "SELECT events.content, events.context
+                    (sql db "SELECT events.content, events.context, branches_events.id
                          FROM branches_events
                          INNER JOIN events ON branches_events.event_id = events.id
                          WHERE branches_events.branch_id = ?
                          ORDER BY branches_events.sequence_number DESC
                          LIMIT ? OFFSET ?;")
                     (sexp->string id) limit offset)))
-    (map (lambda (l) (list (car l) (state-by-id (cadr l))))
+    (map (lambda (l) (list (car l) (state-by-id (cadr l)) (caddr l)))
          tmp)))
+
+(define (event-neighbors room-id event-branch-id)
+  (let* ((base-seq (query fetch-value
+                          (sql db "select sequence_number from branches_events where id = ?;")
+                          event-branch-id))
+         (next (query fetch-value
+                      (sql db "select sequence_number from branches_events where branch_id = ? and sequence_number > ? order by sequence_number asc limit 1;")
+                      (sexp->string room-id) base-seq))
+         (prev (query fetch-value
+                      (sql db "select sequence_number from branches_events where branch_id = ? and sequence_number < ? order by sequence_number desc limit 1;")
+                      (sexp->string room-id) base-seq)))
+    (list prev base-seq next)))
 
 (define *state-cache* (make-lru-cache 100 equal?))
 

@@ -15,12 +15,27 @@
     (wcolor_set statuswin 1 #f) ;; regular foreground
     (waddstr* statuswin (sprintf "~a" (string-join notifs-names " ")))))
 
+(define *requested-holes* '())
+
 (define (refresh-messageswin)
   (let ((timeline (room-timeline (current-room) limit: rows))
         (read-marker (read-marker-ref (current-room))))
     (werase messageswin)
     (for-each
       (lambda (evt+ctx)
+        ;; Visible holes are dynamically loaded
+        (when (equal? (mref '(type) (car evt+ctx))
+                      "com.upyum.ensemble.hole")
+          (let* ((from (mref '(content from) (car evt+ctx)))
+                 (hole (list (current-room) from))
+                 (limit rows))
+            (info "[hole-detected] ~a ~s ~a~%" (current-room) hole limit)
+            (when (and (not (member hole *requested-holes*))
+                       (not (zero? limit)))
+              (set! *requested-holes* (cons hole *requested-holes*))
+              (defer 'hole-messages request-hole-messages
+                     (current-room) (car evt+ctx) (caddr evt+ctx)
+                     limit hole))))
         (maybe-newline)
         (wprintw messageswin "~A" (print-event (car evt+ctx) (cadr evt+ctx)))
         (when (and read-marker (equal? read-marker (mref '(event_id) (car evt+ctx))))
@@ -81,6 +96,50 @@
     (when id
       (room-mark-read (current-room) id))))
 
+(define (request-hole-messages room-id hole-evt hole-id limit hole)
+  (let* ((msgs (room-messages room-id from: (mref '(content from) hole-evt) limit: limit dir: 'b)))
+    (list room-id hole-id msgs hole)))
+
+(define (fill-hole room-id hole-id msgs hole)
+  (let* ((incoming-events (mref '(chunk) msgs))
+         (new-events (reverse! (filter-out-known-events! (vector->list incoming-events))))
+         (number (+ (length new-events) 2))
+         (neighs (event-neighbors room-id hole-id))
+         (incr (if (car neighs) (/ (- (caddr neighs) (car neighs)) number) 1))
+         (start (if (car neighs) (+ (car neighs) incr) (- (caddr neighs) number)))
+         (ctx-id "empty-state")
+         )
+    (info "[fill-hole] ~a ~a ~s number: ~a start: ~a incr: ~a end: ~a~%"
+          room-id hole-id neighs number start incr (+ start -1 (* number incr)))
+    (with-transaction db
+      (lambda ()
+        ;; New hole
+        (unless (null? new-events)
+          (let ((evt-id (sprintf "hole-~A-~A" room-id start)))
+            (event-set! evt-id
+                        `((type . "com.upyum.ensemble.hole")
+                          (content (from . ,(mref '(end) msgs))))
+                        ctx-id)
+            (info "[new-hole] room: ~A seq: ~A evt: ~A~%" room-id start evt-id)
+            (branch-insert! room-id start evt-id)
+            (set! start (+ start incr))))
+        (branch-remove! hole-id)
+        (for-each
+          (lambda (i evt)
+            (let ((evt-id (mref '(event_id) evt)))
+              (event-set! evt-id evt ctx-id)
+              (branch-insert! room-id
+                              (+ start (* i incr))
+                              evt-id)))
+          (iota (length new-events))
+          new-events)))
+    (set! *requested-holes* (delete! hole *requested-holes*))
+    (refresh-messageswin)))
+
+(define (filter-out-known-events! evts)
+  (take-while! (lambda (evt) (null? (event-ref (mref '(event_id) evt))))
+               evts))
+
 (define (initialize-room! room-data)
   (let* ((room-id (car room-data))
          (events (mref '(state events) (cdr room-data)))
@@ -118,7 +177,8 @@
         ((sync) (defer 'sync sync timeout: 30000 since: (handle-sync datum)))
         ((input) (handle-input datum) (defer 'input get-input))
         ((resize) (resize-terminal))
-        (else  (info "Unknown defered procedure: ~a~%" who datum))
+        ((hole-messages) (apply fill-hole datum))
+        (else  (info "Unknown defered procedure: ~a ~s~%" who datum))
          ))
       )
   (main-loop))
@@ -133,7 +193,7 @@
 
 (define (handle-sync batch #!optional (update-ui #t))
   (let ((next (mref '(next_batch) batch)))
-    (info "[~A] update: ~a~%" (seconds->string) next)
+    #;(info "[~A] update: ~a~%" (seconds->string) next)
     (with-transaction db
       (lambda ()
         (for-each (cut advance-room <> update-ui) (mref '(rooms join) batch))
