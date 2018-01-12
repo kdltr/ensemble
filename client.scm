@@ -98,22 +98,16 @@
          (name (or (member-displayname sender ctx)
                    sender))
          (type (mref '(content msgtype) evt))
-         (body (mref '(content body) evt))
-         (timestamp (mref '(origin_server_ts) evt))
-         (time (if timestamp
-                   (time->string
-                     (seconds->local-time (/ timestamp 1000))
-                     "%d/%m %H:%M")
-                   "unknown")))
+         (body (mref '(content body) evt)))
     (if body
         (case (string->symbol type)
-          ((m.emote) (sprintf "[~a] * ~a ~a" time name body))
+          ((m.emote) (sprintf "* ~a ~a" name body))
           ((m.image m.file m.video m.audio)
-           (sprintf "[~a] *** ~a uploaded ~a: ~a" time name body
+           (sprintf "*** ~a uploaded ~a: ~a" name body
                     (or (mxc->url (mref '(content url) evt))
                         "[invalid uri]")))
-          (else (sprintf "[~a] <~a> ~a" time name body)))
-        (sprintf "[~a] <~a> [redacted]" time name))
+          (else (sprintf "<~a> ~a" name body)))
+        (sprintf "<~a> [redacted]" name))
         ))
 
 ;; TODO fix this mess up
@@ -158,8 +152,7 @@
            (sprintf "*** ~A joined the room" displayed-name))))))
 
 (define (com.upyum.ensemble.hole-printer evt ctx)
-  (sprintf "...~%Some history excluded~%...")
-  )
+  (sprintf "### Some history excluded..."))
 
 (define event-printers
   `((m.room.message . ,m.room.message-printer)
@@ -172,12 +165,19 @@
   (let* ((type (string->symbol (mref '(type) evt)))
          (content (mref '(content) evt))
          (printer (alist-ref type event-printers))
-         (str (and printer (printer evt ctx))))
-    (if str
-        (if (eq? (void) str)
-            (sprintf "##### BUG in printer for ~a~%EVT: ~s~%CTX: ~s" type evt ctx)
-            str)
-        (sprintf "No event printer for ~a: ~s" type content))))
+         (str (and printer (printer evt ctx)))
+         (timestamp (mref '(origin_server_ts) evt))
+         (time (if timestamp
+                   (time->string
+                     (seconds->local-time (/ timestamp 1000))
+                     "%d/%m %H:%M")
+                   "unknown")))
+    (sprintf "[~a] ~a~%" time
+             (if str
+                 (if (eq? (void) str)
+                     (sprintf "### BUG in printer for ~a~%EVT: ~s~%CTX: ~s" type evt ctx)
+                     str)
+                 (sprintf "No event printer for ~a: ~s" type content)))))
 
 
 
