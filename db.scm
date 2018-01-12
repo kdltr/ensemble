@@ -188,7 +188,7 @@ EOF
                       (sexp->string room-id) base-seq)))
     (list prev base-seq next)))
 
-(define *state-cache* (make-lru-cache 100 equal?))
+(define *state-cache* (make-lru-cache 10 equal?))
 
 (define (state-by-id state-id)
   (or (lru-cache-ref *state-cache* state-id)
