@@ -211,7 +211,7 @@
 ;; History down
 (define-key KEY_NPAGE
   (let* ((current-offset (room-offset (current-room)))
-         (next (events-next (current-room) current-offset (quotient rows 2))))
+         (next (events-next (current-room) current-offset 1)))
     (unless (null? next)
       (let ((new-offset (last next)))
         (if (= new-offset (branch-last-sequence-number (current-room)))
@@ -222,8 +222,8 @@
 ;; History up
 (define-key KEY_PPAGE
   (let* ((current-offset (room-offset (current-room)))
-         (prev (events-previous (current-room) current-offset (quotient rows 2))))
-    (unless (< (length prev) (quotient rows 2))
+         (prev (events-previous (current-room) current-offset 1)))
+    (unless (null? prev)
       (room-offset-set! (current-room) (last prev))
       (refresh-messageswin))))
 
