@@ -1,0 +1,3 @@
+[submodule "chicken-ncurses"]
+	path = chicken-ncurses
+	url = git://upyum.com/forks/chicken-ncurses
