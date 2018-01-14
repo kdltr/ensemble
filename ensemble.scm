@@ -43,7 +43,10 @@
   (flush-output)
   (if passwd
       (with-stty '(not echo)
-        (lambda () (read-line)))
+        (lambda ()
+          (let ((in (read-line)))
+            (newline)
+            in)))
       (read-line)))
 
 (define (prompt-credentials)

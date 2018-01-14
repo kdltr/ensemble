@@ -205,6 +205,8 @@
   (init_pair 1 COLOR_BLACK COLOR_WHITE)
   (init_pair 2 COLOR_RED COLOR_WHITE)
   (wbkgdset statuswin (COLOR_PAIR 1))
+  (wprintw messageswin "Loading…")
+  (wrefresh messageswin)
   )
 
 (define current-room (make-parameter #f))
