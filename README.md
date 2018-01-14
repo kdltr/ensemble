@@ -17,18 +17,27 @@ If you want to support this project, consider donating [on liberapay](https://li
 How to use it
 -------------
 
-Compile it with `csc ensemble.scm` then run `./ensemble`
+If you grabbed the source from git:
+`git submodule init` followed by `git submodule update`
+
+To build from sources (git or source tarball) run:
+`make`
+
+Run with:
+`./ensemble`
 
 It will prompt you for your server’s URL and credentials.
 
-You can quit by typing /exit or /quit at the input prompt, your session will be saved in `config.scm` and automatically loaded back next time.
+You can quit by typing /exit or /quit at the input prompt.
+
+All configuration and session storage is kept in the $XDG_CONFIG_HOME/ensemble.dat file (usually ~/.config/ensemble.dat)
 
 
 Available commands
 ------------------
 
 - `/me text` sends an emote
-- `/room regexp` (or `/r regexp`) room moves you to the given room
+- `/room regexp` (or `/r regexp`) room moves you to the room matching the regex
 - `/exit` or `/quit` saves the session to config.scm and quits
 
 
@@ -45,6 +54,10 @@ Available key bindings
 - `M-b` moves the cursor back one word
 - `M-f` moves the cursor forward one word
 - `M-d` removes the word at the right of the cursor
+- `C-w` removes the word at the left of the cursor
+- `Return` when the input line is empty moves the read marker to the last message
+- `Page Up` and `Page Down` scroll the history of the current room
+- `M-n` switches to the first room of the notification stack
 
 TUI Roadmap and ideas
 ---------------------
