@@ -303,6 +303,7 @@
   (let ((rows+cols (ioctl-winsize tty-fileno)))
     (set! rows (car rows+cols))
     (set! cols (cadr rows+cols))
+    (move-extent cursor-pos) ;; input line cursor
     (resizeterm rows cols)
     (wresize messageswin (- rows 2) cols)
     (mvwin messageswin 0 0)
