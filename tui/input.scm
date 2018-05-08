@@ -208,6 +208,12 @@
         ((not (null? *notifications*))
          (switch-room (car *notifications*)))))
 
+(define-key #\x0e ;; C-n
+  (cond ((not (null? *notifications*))
+         (switch-room (last *notifications*)))
+        ((not (null? *highlights*))
+         (switch-room (last *highlights*)))))
+
 ;; History down
 (define-key KEY_NPAGE
   (let* ((current-offset (room-offset (current-room)))
