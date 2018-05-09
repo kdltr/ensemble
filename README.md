@@ -58,6 +58,7 @@ Available key bindings
 - `Return` when the input line is empty moves the read marker to the last message
 - `Page Up` and `Page Down` scroll the history of the current room
 - `M-n` switches to the first room of the notification stack
+- `C-n` switches to the last room of the notification stack
 - `Tab` to auto-complete nicknames (only works at the beginning of a message)
 
 TUI Roadmap and ideas
