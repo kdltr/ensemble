@@ -208,7 +208,10 @@
     (if (uncaught-exception? (car data))
         (condition-case (signal (uncaught-exception-reason (car data)))
           (exn (exn i/o net)  (retry exn) (values 'no-one #f))
-          (exn (exn http server-error)  (retry exn) (values 'no-one #f)))
+          (exn (exn http server-error)  (retry exn) (values 'no-one #f))
+          (exn (exn http client-error premature-disconnection)
+            (retry exn)
+            (values 'no-one #f)))
         (apply values data))))
 
 (define (handle-sync batch #!optional (update-ui #t))
