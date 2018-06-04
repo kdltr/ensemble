@@ -209,7 +209,7 @@
         (condition-case (signal (uncaught-exception-reason (car data)))
           (exn (exn i/o net)  (retry exn) (values 'no-one #f))
           (exn (exn http server-error)  (retry exn) (values 'no-one #f))
-          (exn (exn http client-error premature-disconnection)
+          (exn (exn http premature-disconnection)
             (retry exn)
             (values 'no-one #f)))
         (apply values data))))

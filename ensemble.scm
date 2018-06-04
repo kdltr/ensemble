@@ -64,6 +64,7 @@
     (on-exit void)
     ;; Disable ncurses before printing the error message and call trace
     (endwin)
+    (print exn)
     (signal exn))
   (on-exit endwin)
   (startup))
