@@ -29,10 +29,13 @@
 
 
 (module main ()
-(import scheme chicken extras client-mod)
+(import scheme chicken extras foreign client-mod)
 (use (only uri-common uri->string)
      (only ncurses endwin)
      stty)
+
+(foreign-declare "#include <locale.h>")
+(foreign-code "setlocale(LC_ALL, \"C.UTF-8\");")
 
 (cond-expand
       (csi (enable-warnings #t))
