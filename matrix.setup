@@ -1,2 +1,1 @@
-(compile -s -J ensemble.utils.scm)
-(compile -s -d0 ensemble.utils.import.scm)
+(compile ensemble.scm)
