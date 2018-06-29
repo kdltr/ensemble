@@ -1,5 +1,34 @@
-(module client-mod (init! password-login access-token server-uri mxid startup
-                    config-ref config-set!)
+(module debug (info)
+(import scheme chicken extras)
+(cond-expand
+      (debug (define (info fmt . args)
+               (apply fprintf (current-error-port) fmt args)))
+      (else (define-syntax info
+              (syntax-rules ()
+                ((info . rest) (void)))))))
+
+
+
+(module defer (defer receive-defered retry
+               thread-join-protected!)
+(import scheme chicken debug srfi-18)
+(use gochan)
+(include "defer.scm"))
+
+
+
+(module backend (init! password-login access-token server-uri mxid
+                 config-ref config-set!
+                       mref mupdate mdelete
+                       sync any-room room-display-name read-marker-ref
+                       room-timeline branch-last-sequence-number
+                       request-hole-messages print-event room-exists?
+                       room-name json-true? member-displayname room-context
+                       joined-rooms handle-sync fill-hole message:emote
+                       events-previous events-next message:text
+                       mark-last-message-as-read room-members
+                       *requested-holes*
+                       )
 (import
   (except scheme
           string-length string-ref string-set! make-string string substring
@@ -9,27 +38,44 @@
   (except data-structures
           ->string conc string-chop string-split string-translate
           substring=? substring-ci=? substring-index substring-index-ci)
-  (except extras
-          read-string write-string read-token)
-  ports files posix)
+  ports files posix srfi-1
+  defer debug)
 
-(use utf8 utf8-srfi-13 utf8-srfi-14 unicode-char-sets
-     vector-lib clojurian-syntax uri-common openssl
-     ncurses gochan miscmacros srfi-1 posix irregex
-     srfi-18 intarweb (except medea read-json) cjson
-     rest-bind uri-common (prefix http-client http:)
-     (except sql-de-lite reset) lru-cache
-     ioctl)
+(use utf8 utf8-srfi-13 vector-lib uri-common openssl
+     intarweb (except medea read-json) cjson
+     rest-bind (prefix http-client http:)
+     (except sql-de-lite reset) lru-cache)
 
 (define +ensemble-version+ "dev")
 
 (include "db.scm")
+(include "matrix.scm")
 (include "client.scm")
 )
 
 
+
+(module frontend *
+(import
+  (except scheme
+          string-length string-ref string-set! make-string string substring
+          string->list list->string string-fill! write-char read-char display)
+  (except chicken
+          reverse-list->string print print*)
+  (except data-structures
+          ->string conc string-chop string-split string-translate
+          substring=? substring-ci=? substring-index substring-index-ci)
+  srfi-1 posix data-structures irregex srfi-18 miscmacros
+  defer debug backend)
+(use ioctl ncurses utf8 utf8-srfi-13 utf8-srfi-14 unicode-char-sets)
+(include "tui.scm")
+(include "tui/input.scm")
+)
+
+
+
 (module main ()
-(import scheme chicken extras foreign client-mod)
+(import scheme chicken extras foreign backend frontend)
 (use (only uri-common uri->string)
      (only ncurses endwin)
      stty)

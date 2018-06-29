@@ -5,8 +5,6 @@
 (define statuswin)
 (define messageswin)
 
-(include "tui/input.scm")
-
 (define (start-interface)
   ;; Make ncurses wait less time when receiving an ESC character
   (setenv "ESCDELAY" "20")
@@ -33,11 +31,8 @@
 
 (define current-room (make-parameter #f))
 
-(define ui-chan (gochan 0))
-
 (define *notifications* '())
 (define *highlights* '())
-
 
 (define (waddstr* win str)
   (handle-exceptions exn #t
@@ -146,7 +141,7 @@
   (wnoutrefresh statuswin)
   (wnoutrefresh inputwin)
   (doupdate)
-  (let ((th (gochan-recv ui-chan)))
+  (let ((th (receive-defered)))
     (receive (who datum) (thread-join-protected! th)
       (case who
         ((sync) (defer 'sync sync timeout: 30000 since: (handle-sync datum)))
@@ -157,26 +152,6 @@
          ))
       )
   (main-loop))
-
-(define (thread-join-protected! thread)
-  (receive data (handle-exceptions exn exn (thread-join! thread))
-    (if (uncaught-exception? (car data))
-        (condition-case (signal (uncaught-exception-reason (car data)))
-          (exn (exn i/o net)  (retry exn) (values 'no-one #f))
-          (exn (exn http server-error)  (retry exn) (values 'no-one #f))
-          (exn (exn http premature-disconnection)
-            (retry exn)
-            (values 'no-one #f)))
-        (apply values data))))
-
-(define (handle-sync batch #!optional (update-ui #t))
-  (let ((next (mref '(next_batch) batch)))
-    #;(info "[~A] update: ~a~%" (seconds->string) next)
-    (with-transaction db
-      (lambda ()
-        (for-each (cut advance-room <> update-ui) (mref '(rooms join) batch))
-        (config-set! 'next-batch next)))
-    next))
 
 (define (get-input)
   (thread-wait-for-i/o! tty-fileno #:input)

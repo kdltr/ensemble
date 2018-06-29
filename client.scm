@@ -1,14 +1,5 @@
 (void)
 
-(cond-expand
-      (csi (define (info fmt . args)
-               (apply fprintf (current-error-port) fmt args)))
-      (else (define-syntax info
-              (syntax-rules ()
-                ((info . rest) (void))))))
-
-(include "matrix.scm")
-
 ;; Enable server certificate validation for https URIs.
 (define ((make-ssl-server-connector ctx) uri proxy)
   (let ((remote-end (or proxy uri)))
@@ -36,11 +27,11 @@
 ;; Utilities
 ;; =========
 
-(define (mark-last-message-as-read)
-  (let* ((last-evt (caar (room-timeline (current-room) limit: 1)))
-         (id (mref '(event_id) last-evt)))
-    (when id
-      (room-mark-read (current-room) id))))
+(define (mark-last-message-as-read room-id)
+  (let* ((last-evt (caar (room-timeline room-id limit: 1)))
+         (evt-id (mref '(event_id) last-evt)))
+    (when evt-id
+      (room-mark-read room-id evt-id))))
 
 (define (room-display-name id)
   (let ((ctx (room-context id)))
@@ -222,6 +213,15 @@
     (last-state-set! room-id state-id)
     (list state-id state)))
 
+(define (handle-sync batch #!optional (update-ui #t))
+  (let ((next (mref '(next_batch) batch)))
+    #;(info "[~A] update: ~a~%" (seconds->string) next)
+    (with-transaction db
+      (lambda ()
+        (for-each (cut advance-room <> update-ui) (mref '(rooms join) batch))
+        (config-set! 'next-batch next)))
+    next))
+
 (define (advance-room room-data #!optional (update-ui #t))
   (let* ((room-id (car room-data))
          (window-dirty #f)
@@ -287,12 +287,13 @@
                              datum)
                            )))
                      ephemerals)
-    (when (and update-ui window-dirty (eq? (current-room) room-id))
+    ;; TODO notifications from backend to frontend
+    #;(when (and update-ui window-dirty (eq? (current-room) room-id))
       (refresh-messageswin))
-    (when (and highlights (> highlights 0) (not (eq? (current-room) room-id)))
+    #;(when (and highlights (> highlights 0) (not (eq? (current-room) room-id)))
       (set! *highlights* (lset-adjoin eq? *highlights* room-id))
       (when update-ui (refresh-statuswin) (beep)))
-    (when (and notifs (> notifs 0) (not (eq? (current-room) room-id)))
+    #;(when (and notifs (> notifs 0) (not (eq? (current-room) room-id)))
       (set! *notifications* (lset-adjoin eq? *notifications* room-id))
       (when update-ui (refresh-statuswin)))
   ))
@@ -345,7 +346,8 @@
             (info "[new-hole] room: ~A seq: ~A evt: ~A~%" room-id start evt-id)
             (branch-insert! room-id start evt-id)))))
     (set! *requested-holes* (delete! hole *requested-holes*))
-    (refresh-messageswin)))
+    ;; TODO send messages to frontend
+    #;(refresh-messageswin)))
 
 (define (filter-out-known-events! evts)
   (take-while! (lambda (evt) (null? (event-ref (mref '(event_id) evt))))
@@ -357,5 +359,3 @@
                               limit: limit
                               dir: 'b)))
     (list room-id hole-evt-id hole-id msgs hole)))
-
-(include "tui.scm")

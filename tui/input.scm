@@ -141,10 +141,15 @@
 (define-key #\x0B ;; C-k
   (buffer-kill!))
 
+(define-key #\x0C ;; C-l
+  (refresh-statuswin)
+  (refresh-inputwin)
+  (refresh-messageswin))
+
 (define-key #\newline
   (cond ((or (string=? "" input-string)
              (string-every char-set:white-space input-string))
-         (mark-last-message-as-read))
+         (mark-last-message-as-read (current-room)))
         ((char=? (string-ref input-string 0) #\/)
          (handle-command input-string))
         (else

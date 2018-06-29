@@ -34,31 +34,6 @@
                     alist
                     equal?)))
 
-;; Defering API
-;; ============
-
-(define (defer id proc . args)
-  (unless (memq id '(input sync)) (info "[defer] ~s ~s ~s~%" id proc args))
-  (thread-start!
-    (lambda ()
-      (let ((res (handle-exceptions exn exn (apply proc args))))
-        (gochan-send ui-chan (current-thread))
-        (if (condition? res)
-            (signal (make-composite-condition
-                      res
-                      (make-property-condition 'defered 'id id 'proc proc 'args args)))
-            (values id res))))))
-
-;; Retry a failed defered procedure
-(define (retry exn)
-  (let ((id (get-condition-property exn 'defered 'id #f))
-        (proc (get-condition-property exn 'defered 'proc #f))
-        (args (get-condition-property exn 'defered 'args #f)))
-    (if (and id proc args)
-        (begin
-          (info "[retry] retrying ~a~%" exn)
-          (defer id (lambda (args) (thread-sleep! 1) (apply proc args)) args))
-        (info "[retry] failed to retry: ~a~%" exn))))
 
 
 ;; High level API
