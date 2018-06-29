@@ -1,5 +1,4 @@
-;; Make ncurses wait less time when receiving an ESC character
-(setenv "ESCDELAY" "20")
+(void)
 
 (cond-expand
       (csi (define (info fmt . args)
@@ -31,6 +30,30 @@
   (when uri (init! uri))
   (access-token (config-ref 'access-token))
   (mxid (config-ref 'mxid)))
+
+
+
+;; Utilities
+;; =========
+
+(define (mark-last-message-as-read)
+  (let* ((last-evt (caar (room-timeline (current-room) limit: 1)))
+         (id (mref '(event_id) last-evt)))
+    (when id
+      (room-mark-read (current-room) id))))
+
+(define (room-display-name id)
+  (let ((ctx (room-context id)))
+    (or (room-name ctx)
+        (json-true? (mref '(("" . m.room.canonical_alias) alias) ctx))
+        (and-let* ((v (json-true? (mref '(("" . m.room.aliases) aliases) ctx))))
+             (vector-ref v 0))
+        (and-let* ((members (room-members ctx))
+                   (check (= (length members) 2))
+                   (others (remove (lambda (p) (equal? (caar p) (string-downcase (mxid)))) members)))
+             (or (member-displayname (caaar others) ctx)
+                 (caaar others)))
+        (symbol->string id))))
 
 
 
@@ -184,39 +207,155 @@
 
 
 
-(define tty-fileno 0)
-(define rows)
-(define cols)
-(define inputwin)
-(define statuswin)
-(define messageswin)
+;; Room management
+;; ===============
 
-(define (start-interface)
-  (initscr)
-  (noecho)
-  (cbreak)
-  (start_color)
-  (set!-values (rows cols) (getmaxyx (stdscr)))
+(define (initialize-room! room-data)
+  (let* ((room-id (car room-data))
+         (events (mref '(state events) (cdr room-data)))
+         (state (initial-context events))
+         (state-id (if (null? state)
+                       "empty-state"
+                       (mref '(event_id)
+                             (vector-ref events (sub1 (vector-length events)))))))
+    (state-set! state-id state)
+    (last-state-set! room-id state-id)
+    (list state-id state)))
 
-  (set! messageswin (newwin (- rows 2) cols 0 0))
-  (scrollok messageswin #t)
-  (idlok messageswin #t)
+(define (advance-room room-data #!optional (update-ui #t))
+  (let* ((room-id (car room-data))
+         (window-dirty #f)
+         (limited (mref '(timeline limited) (cdr room-data)))
+         (events (mref '(timeline events) (cdr room-data)))
+         (ephemerals (mref '(ephemeral events) (cdr room-data)))
+         (state (mref '(state events) (cdr room-data)))
+         (notifs (mref '(unread_notifications notification_count) (cdr room-data)))
+         (highlights (mref '(unread_notifications highlight_count) (cdr room-data)))
+         (base-sequence (add1 (branch-last-sequence-number room-id)))
+         (init-ctx (cond ((and (room-exists? room-id) (vector? state) (not (vector-empty? state)))
+                          (let ((id (mref '(event_id)
+                                          (vector-ref state (sub1 (vector-length state)))))
+                                (ctx (vector-fold (lambda (i ctx evt) (update-context ctx evt))
+                                                  (room-context room-id)
+                                                  state)))
+                            (state-set! id ctx)
+                            (list id ctx)))
+                         ((room-exists? room-id)
+                          (room-last-state-id-and-state room-id))
+                         (else
+                           (initialize-room! room-data)))))
+    ;; Timeline Hole
+    (when limited
+      (info "======= LIMITED~%")
+      (let ((evt-id (sprintf "hole-~A-~A" room-id base-sequence)))
+        (event-set! evt-id
+                    `((type . "com.upyum.ensemble.hole")
+                      (content (from . ,(mref '(timeline prev_batch) (cdr room-data)))))
+                    (car init-ctx))
+        (info "room: ~A seq: ~A evt: ~A~%" room-id base-sequence evt-id)
+        (branch-insert! room-id base-sequence evt-id)
+        (set! base-sequence (add1 base-sequence))))
+    ;; Timeline
+    (vector-for-each (lambda (i evt)
+                       (let* ((id+old-ctx init-ctx)
+                              (prev-ctx-id (car id+old-ctx))
+                              (old-ctx (cadr id+old-ctx))
+                              (new-ctx (update-context old-ctx evt))
+                              (evt-id (mref '(event_id) evt)))
+                         (event-set! evt-id evt prev-ctx-id)
+                         (when (not (eq? old-ctx new-ctx))
+                           (state-set! evt-id new-ctx)
+                           (set! init-ctx (list evt-id new-ctx)))
+                         (last-state-set! room-id (car init-ctx))
+                         (branch-insert! room-id
+                                         (+ base-sequence i)
+                                         evt-id)
+                         (set! window-dirty #t)
+                         ))
+                     events)
+    ;; Ephemerals
+    (vector-for-each (lambda (i evt)
+                       (when (equal? (mref '(type) evt) "m.receipt")
+                         (let ((datum (mref '(content) evt)))
+                           (for-each (lambda (id+reads)
+                                       (when (member (string-downcase (mxid))
+                                                     (map (o string-downcase symbol->string car)
+                                                       (mref '(m.read) (cdr id+reads))))
+                                         (info "[marker] id+reads: ~s~%" id+reads)
+                                         (read-marker-set! room-id (car id+reads))
+                                         (set! window-dirty #t)))
+                             datum)
+                           )))
+                     ephemerals)
+    (when (and update-ui window-dirty (eq? (current-room) room-id))
+      (refresh-messageswin))
+    (when (and highlights (> highlights 0) (not (eq? (current-room) room-id)))
+      (set! *highlights* (lset-adjoin eq? *highlights* room-id))
+      (when update-ui (refresh-statuswin) (beep)))
+    (when (and notifs (> notifs 0) (not (eq? (current-room) room-id)))
+      (set! *notifications* (lset-adjoin eq? *notifications* room-id))
+      (when update-ui (refresh-statuswin)))
+  ))
 
-  (set! inputwin (newwin 1 cols (- rows 1) 0))
-  (keypad inputwin #t)
-  (set! statuswin (newwin 1 cols (- rows 2) 0))
-  (init_pair 1 COLOR_BLACK COLOR_WHITE)
-  (init_pair 2 COLOR_RED COLOR_WHITE)
-  (wbkgdset statuswin (COLOR_PAIR 1))
-  (wprintw messageswin "Loading…")
-  (wrefresh messageswin)
-  )
 
-(define current-room (make-parameter #f))
 
-(define ui-chan (gochan 0))
+;; Holes management
+;; ================
 
-(define *notifications* '())
-(define *highlights* '())
+(define *requested-holes* '())
+
+(define (fill-hole room-id hole-evt-id hole-id msgs hole)
+  (let* ((incoming-events (mref '(chunk) msgs))
+         (new-events (filter-out-known-events! (vector->list incoming-events)))
+         (number (+ (length new-events) 2))
+         (neighs (event-neighbors room-id hole-id))
+         (incr (if (car neighs) (/ (- (caddr neighs) (car neighs)) number) 1))
+         (start (if (car neighs) (+ (car neighs) incr) (- (caddr neighs) number)))
+         (ctx-id (cadr (event-ref hole-evt-id)))
+         (ctx (state-by-id ctx-id))
+         )
+    (info "[fill-hole] ~a ~a ~s number: ~a start: ~a incr: ~a end: ~a~%"
+          room-id hole-id neighs number start incr (+ start -1 (* number incr)))
+    (with-transaction db
+      (lambda ()
+        (branch-remove! hole-id)
+        (for-each
+          (lambda (i evt)
+            (let* ((evt-id (mref '(event_id) evt))
+                   (new-ctx (update-context ctx evt #t)))
+              (unless (equal? ctx new-ctx)
+                (state-set! evt-id new-ctx)
+                (set! ctx-id evt-id)
+                (set! ctx new-ctx))
+              (event-set! evt-id evt ctx-id)
+              (branch-insert! room-id
+                              (+ start (* i incr))
+                              evt-id)))
+          (iota (length new-events)
+                (length new-events)
+                -1)
+          new-events)
+        ;; New hole
+        (unless (null? new-events)
+          (let ((evt-id (sprintf "hole-~A-~A" room-id start)))
+            (event-set! evt-id
+                        `((type . "com.upyum.ensemble.hole")
+                          (content (from . ,(mref '(end) msgs))))
+                        ctx-id)
+            (info "[new-hole] room: ~A seq: ~A evt: ~A~%" room-id start evt-id)
+            (branch-insert! room-id start evt-id)))))
+    (set! *requested-holes* (delete! hole *requested-holes*))
+    (refresh-messageswin)))
+
+(define (filter-out-known-events! evts)
+  (take-while! (lambda (evt) (null? (event-ref (mref '(event_id) evt))))
+               evts))
+
+(define (request-hole-messages room-id hole-evt-id hole-evt hole-id limit hole)
+  (let* ((msgs (room-messages room-id
+                              from: (mref '(content from) hole-evt)
+                              limit: limit
+                              dir: 'b)))
+    (list room-id hole-evt-id hole-id msgs hole)))
 
 (include "tui.scm")
