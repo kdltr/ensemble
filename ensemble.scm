@@ -73,7 +73,8 @@
 )
 
 
-
+(cond-expand (csi)
+      (else
 (module main ()
 (import scheme chicken extras foreign backend frontend)
 (use (only uri-common uri->string)
@@ -117,4 +118,4 @@
     (signal exn))
   (on-exit endwin)
   (startup))
-)
+)))
