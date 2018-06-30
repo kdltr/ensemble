@@ -250,7 +250,9 @@
       (let ((evt-id (sprintf "hole-~A-~A" room-id base-sequence)))
         (event-set! evt-id
                     `((type . "com.upyum.ensemble.hole")
-                      (content (from . ,(mref '(timeline prev_batch) (cdr room-data)))))
+                      (content (from . ,(mref '(timeline prev_batch)
+                                              (cdr room-data))))
+                      (formated . "… some history missing …"))
                     (car init-ctx))
         (info "room: ~A seq: ~A evt: ~A~%" room-id base-sequence evt-id)
         (branch-insert! room-id base-sequence evt-id)
@@ -262,7 +264,10 @@
                               (old-ctx (cadr id+old-ctx))
                               (new-ctx (update-context old-ctx evt))
                               (evt-id (mref '(event_id) evt)))
-                         (event-set! evt-id evt prev-ctx-id)
+                         (event-set! evt-id
+                                     `((event_id . ,evt-id)
+                                       (formated . ,(print-event evt old-ctx)))
+                                     prev-ctx-id)
                          (when (not (eq? old-ctx new-ctx))
                            (state-set! evt-id new-ctx)
                            (set! init-ctx (list evt-id new-ctx)))
@@ -327,8 +332,11 @@
               (unless (equal? ctx new-ctx)
                 (state-set! evt-id new-ctx)
                 (set! ctx-id evt-id)
-                (set! ctx new-ctx))
-              (event-set! evt-id evt ctx-id)
+                (set! ctx new-ctx)) ;; FIXME this is wrong
+              (event-set! evt-id
+                          `((event_id . ,evt-id)
+                            (formated . ,(print-event evt ctx)))
+                          ctx-id)
               (branch-insert! room-id
                               (+ start (* i incr))
                               evt-id)))
@@ -341,7 +349,8 @@
           (let ((evt-id (sprintf "hole-~A-~A" room-id start)))
             (event-set! evt-id
                         `((type . "com.upyum.ensemble.hole")
-                          (content (from . ,(mref '(end) msgs))))
+                          (content (from . ,(mref '(end) msgs)))
+                          (formated . "… some history missing …"))
                         ctx-id)
             (info "[new-hole] room: ~A seq: ~A evt: ~A~%" room-id start evt-id)
             (branch-insert! room-id start evt-id)))))

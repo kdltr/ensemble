@@ -178,7 +178,7 @@ EOF
                          ORDER BY branches_events.sequence_number DESC
                          LIMIT ?;")
                     (sexp->string id) offset limit)))
-    (map (lambda (l) (list (car l) (state-by-id (cadr l)) (caddr l) (cadddr l)))
+    (map (lambda (l) (list (car l) '() (caddr l) (cadddr l)))
          tmp)))
 
 (define (events-previous room-id base-seq limit)

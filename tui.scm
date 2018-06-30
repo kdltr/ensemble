@@ -82,7 +82,7 @@
                      (current-room) (cadddr evt+ctx) (car evt+ctx) (caddr evt+ctx)
                      rows hole))))
         (maybe-newline)
-        (wprintw messageswin "~A" (print-event (car evt+ctx) (cadr evt+ctx)))
+        (wprintw messageswin "~A" (mref '(formated) (car evt+ctx)))
         (when (and read-marker (equal? read-marker (mref '(event_id) (car evt+ctx))))
           (maybe-newline)
           (wprintw messageswin "~A" (make-string cols #\-))))
