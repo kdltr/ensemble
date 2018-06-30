@@ -224,7 +224,6 @@
 
 (define (advance-room room-data #!optional (update-ui #t))
   (let* ((room-id (car room-data))
-         (window-dirty #f)
          (limited (mref '(timeline limited) (cdr room-data)))
          (events (mref '(timeline events) (cdr room-data)))
          (ephemerals (mref '(ephemeral events) (cdr room-data)))
@@ -275,7 +274,6 @@
                          (branch-insert! room-id
                                          (+ base-sequence i)
                                          evt-id)
-                         (set! window-dirty #t)
                          ))
                      events)
     ;; Ephemerals
@@ -287,8 +285,7 @@
                                                      (map (o string-downcase symbol->string car)
                                                        (mref '(m.read) (cdr id+reads))))
                                          (info "[marker] id+reads: ~s~%" id+reads)
-                                         (read-marker-set! room-id (car id+reads))
-                                         (set! window-dirty #t)))
+                                         (read-marker-set! room-id (car id+reads))))
                              datum)
                            )))
                      ephemerals)
