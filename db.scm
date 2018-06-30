@@ -197,13 +197,7 @@ EOF
          (prev (events-previous room-id base-seq 1)))
     (list (if (null? prev) #f (car prev)) base-seq (if (null? next) #f (car next)))))
 
-(define *state-cache* (make-lru-cache 10 equal?))
-
-(define (state-by-id state-id)
-  (or (lru-cache-ref *state-cache* state-id)
-      (let ((state (state-ref state-id)))
-        (lru-cache-set! *state-cache* state-id state)
-        state)))
+(define state-by-id state-ref)
 
 (define (room-last-state-id-and-state room-id)
   (let ((state-id (last-state-ref room-id)))

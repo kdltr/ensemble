@@ -44,7 +44,7 @@
 (use utf8 utf8-srfi-13 vector-lib uri-common openssl
      intarweb (except medea read-json) cjson
      rest-bind (prefix http-client http:)
-     (except sql-de-lite reset) lru-cache)
+     (except sql-de-lite reset))
 
 (define +ensemble-version+ "dev")
 
