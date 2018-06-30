@@ -38,7 +38,7 @@
   (except data-structures
           ->string conc string-chop string-split string-translate
           substring=? substring-ci=? substring-index substring-index-ci)
-  ports files posix srfi-1
+  ports files posix srfi-1 extras
   defer debug)
 
 (use utf8 utf8-srfi-13 vector-lib uri-common openssl
@@ -65,7 +65,7 @@
   (except data-structures
           ->string conc string-chop string-split string-translate
           substring=? substring-ci=? substring-index substring-index-ci)
-  srfi-1 posix data-structures irregex srfi-18 miscmacros
+  srfi-1 posix data-structures irregex srfi-18 miscmacros extras
   defer debug backend)
 (use ioctl ncurses utf8 utf8-srfi-13 utf8-srfi-14 unicode-char-sets)
 (include "tui.scm")
