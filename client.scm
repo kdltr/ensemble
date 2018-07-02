@@ -85,6 +85,14 @@
 (define (joined-rooms)
   *rooms*)
 
+(define (save-db)
+  (with-output-to-file "/tmp/db"
+    (lambda ()
+      (for-each
+        (lambda (r) (write `(room ',r ',(symbol-plist r)))
+                    (newline))
+        *rooms*))))
+
 
 
 ;; Events contexts

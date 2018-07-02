@@ -27,7 +27,7 @@
                        joined-rooms handle-sync fill-hole message:emote
                        events-previous events-next message:text
                        mark-last-message-as-read room-members
-                       *requested-holes*
+                       *requested-holes* save-db
                        )
 (import
   (except scheme
