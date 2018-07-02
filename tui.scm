@@ -72,14 +72,11 @@
         ;; Visible holes are dynamically loaded
         (when (equal? (mref '(type) evt)
                       "com.upyum.ensemble.hole")
-          (let* ((from (mref '(content from) evt))
-                 (hole (list (current-room) from)))
-            (info "[hole-detected] ~a ~s~%" (current-room) hole)
-            (when (not (member hole *requested-holes*))
-              (set! *requested-holes* (cons hole *requested-holes*))
-              #;(defer 'hole-messages request-hole-messages
-                     (current-room) (cadddr evt+ctx) (car evt+ctx) (caddr evt+ctx)
-                     rows hole))))
+          (info "[hole-detected] ~a ~s~%" (current-room) evt)
+          (when (not (member evt *requested-holes*))
+            (set! *requested-holes* (cons evt *requested-holes*))
+            (defer 'hole-messages request-hole-messages
+                   (current-room) evt rows)))
         (maybe-newline)
         (wprintw messageswin "~A" (mref '(formated) evt))
         (when (and read-marker (equal? read-marker (mref '(event_id) evt)))

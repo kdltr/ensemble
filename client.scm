@@ -46,6 +46,13 @@
                  (caaar others)))
         (symbol->string id))))
 
+(define (split-timeline tl evt)
+  (let loop ((before tl)
+             (after '()))
+    (if (equal? evt (car before))
+        (values (cdr before) (reverse after))
+        (loop (cdr before) (cons (car before) after)))))
+
 
 
 ;; DB replacement
@@ -56,11 +63,6 @@
 
 (define (room-context id)
   (get id 'bottom-state))
-
-(define (branch-insert! room-id event)
-  (let ((tl (get room-id 'timeline)))
-    (put! room-id 'timeline
-          (cons event tl))))
 
 (define (last-state-set! room-id ctx)
   (put! room-id 'bottom-state ctx))
@@ -238,7 +240,7 @@
                    "unknown")))
     (sprintf "[~a] ~a~%" time
              (if str
-                 (if (eq? (void) str)
+                 (if (or (eq? (void) str) (equal? "" str))
                      (sprintf "### BUG in printer for ~a~%EVT: ~s~%CTX: ~s" type evt ctx)
                      str)
                  (sprintf "No event printer for ~a: ~s" type content)))))
@@ -272,8 +274,7 @@
                 new-state)))))
 
 (define ((punch-hole prev-batch state-events) timeline state)
-  (info "======= LIMITED in ~A~%" room-id)
-  (values (cons (make-hole-event prev-batch)
+  (values (cons (make-hole-event prev-batch state)
                 timeline)
           (vector-fold (lambda (i ctx evt)
                          (update-context ctx evt))
@@ -346,70 +347,37 @@
 
 (define *requested-holes* '())
 
-(define (make-hole-event from)
+(define (make-hole-event from state)
   (let ((evt-id (sprintf "hole-~A" from)))
     `((event_id . ,evt-id)
       (type . "com.upyum.ensemble.hole")
-      (content (from . ,from))
+      (content (from . ,from)
+               (state . ,state))
       (formated . "… some history missing …"))))
 
-#;(define (fill-hole room-id hole-evt-id hole-id msgs hole)
-  (let* ((incoming-events (mref '(chunk) msgs))
-         (new-events (filter-out-known-events! (vector->list incoming-events)))
-         (number (+ (length new-events) 2))
-         (neighs (event-neighbors room-id hole-id))
-         (incr (if (car neighs) (/ (- (caddr neighs) (car neighs)) number) 1))
-         (start (if (car neighs) (+ (car neighs) incr) (- (caddr neighs) number)))
-         (ctx-id (cadr (event-ref hole-evt-id)))
-         (ctx (state-by-id ctx-id))
-         )
-    (info "[fill-hole] ~a ~a ~s number: ~a start: ~a incr: ~a end: ~a~%"
-          room-id hole-id neighs number start incr (+ start -1 (* number incr)))
-    (with-transaction db
-      (lambda ()
-        (branch-remove! hole-id)
-        (for-each
-          (lambda (i evt)
-            (let* ((evt-id (mref '(event_id) evt))
-                   (new-ctx (update-context ctx evt #t)))
-              (unless (equal? ctx new-ctx)
-                (state-set! evt-id new-ctx)
-                (set! ctx-id evt-id)
-                (set! ctx new-ctx)) ;; FIXME this is wrong
-              (event-set! evt-id
-                          `((event_id . ,evt-id)
-                            (formated . ,(print-event evt ctx)))
-                          ctx-id)
-              (branch-insert! room-id
-                              (+ start (* i incr))
-                              evt-id)))
-          (iota (length new-events)
-                (length new-events)
-                -1)
-          new-events)
-        ;; New hole
-        (unless (null? new-events)
-          (let ((evt-id (sprintf "hole-~A-~A" room-id start)))
-            (event-set! evt-id
-                        `((type . "com.upyum.ensemble.hole")
-                          (content (from . ,(mref '(end) msgs)))
-                          (formated . "… some history missing …"))
-                        ctx-id)
-            (info "[new-hole] room: ~A seq: ~A evt: ~A~%" room-id start evt-id)
-            (branch-insert! room-id start evt-id)))))
-    (set! *requested-holes* (delete! hole *requested-holes*))
-    ;; TODO send messages to frontend
-    #;(refresh-messageswin)))
+(define (fill-hole room-id hole-evt msgs)
+  (info "[fill-hole] ~a ~a~%" room-id hole-evt)
+  (let*-values (((timeline) (room-timeline room-id))
+                ((before-hole after-hole) (split-timeline timeline hole-evt))
+                ((hole-state) (mref '(content state) hole-evt))
+                ((events) (filter-out-known-events
+                            (reverse (vector->list (mref '(chunk) msgs)))
+                            (if (pair? before-hole) (car before-hole) '())))
+                ((new-timeline new-state)
+                 ((advance-timeline (list->vector events)) before-hole hole-state))
+                 )
+    ;; FIXME the state handling is wrong (have to rewind with prev_content)
+    ;; TODO add new hole with msgs.end if chunk is not empty
+    (put! room-id 'timeline (append after-hole new-timeline))
+    )
+  (set! *requested-holes* (delete! hole-evt *requested-holes*)))
 
-(define fill-hole void)
+(define (filter-out-known-events evts ref-evt)
+  (take-while (lambda (o) (not (equal? ref-evt o))) evts))
 
-(define (filter-out-known-events! evts)
-  (take-while! (lambda (evt) (null? (event-ref (mref '(event_id) evt))))
-               evts))
-
-(define (request-hole-messages room-id hole-evt-id hole-evt hole-id limit hole)
+(define (request-hole-messages room-id hole-evt limit)
   (let* ((msgs (room-messages room-id
                               from: (mref '(content from) hole-evt)
                               limit: limit
                               dir: 'b)))
-    (list room-id hole-evt-id hole-id msgs hole)))
+    (list room-id hole-evt msgs)))

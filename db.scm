@@ -191,12 +191,6 @@ EOF
          (sql db "SELECT sequence_number FROM branches_events WHERE branch_id = ? AND sequence_number > ? ORDER BY sequence_number ASC limit ?;")
          (sexp->string room-id) base-seq limit))
 
-(define (event-neighbors room-id event-branch-id)
-  (let* ((base-seq (event-sequence-number event-branch-id))
-         (next (events-next room-id base-seq 1))
-         (prev (events-previous room-id base-seq 1)))
-    (list (if (null? prev) #f (car prev)) base-seq (if (null? next) #f (car next)))))
-
 (define state-by-id state-ref)
 
 (define (room-last-state-id-and-state room-id)
