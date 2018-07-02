@@ -6,7 +6,7 @@
 
 (cond-expand
       (debug (use describe trace)
-             (trace read-json json->string))
+             #;(trace read-json json->string))
       (else))
 
 ;; Chaque requête :

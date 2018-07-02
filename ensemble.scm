@@ -85,7 +85,13 @@
 (foreign-code "setlocale(LC_ALL, \"C.UTF-8\");")
 
 (cond-expand
-      (csi (enable-warnings #t))
+      (debug (enable-warnings #t)
+             (let* ((tty (get-environment-variable "DEBUG_TTY"))
+                    (in (open-input-file tty))
+                    (out (open-output-file tty)))
+               (current-input-port in)
+               (current-output-port out)
+               (current-error-port out)))
       (else (enable-warnings #f)))
 
 (define (prompt msg #!optional (passwd #f))
