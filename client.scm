@@ -28,7 +28,7 @@
 ;; =========
 
 (define (mark-last-message-as-read room-id)
-  (let* ((last-evt (caar (room-timeline room-id limit: 1)))
+  (let* ((last-evt (room-timeline room-id limit: 1))
          (evt-id (mref '(event_id) last-evt)))
     (when evt-id
       (room-mark-read room-id evt-id))))
@@ -45,6 +45,45 @@
              (or (member-displayname (caaar others) ctx)
                  (caaar others)))
         (symbol->string id))))
+
+
+
+;; DB replacement
+;; ==============
+
+(define (room-exists? id)
+  (pair? (symbol-plist id)))
+
+(define (room-context id)
+  (get id 'bottom-state))
+
+(define (branch-insert! room-id event)
+  (let ((tl (get room-id 'timeline)))
+    (put! room-id 'timeline
+          (cons event tl))))
+
+(define (last-state-set! room-id ctx)
+  (put! room-id 'bottom-state ctx))
+
+(define (read-marker-ref room-id)
+  (get room-id 'read-marker))
+
+(define (read-marker-set! room-id event-id)
+  (put! room-id 'read-marker event-id))
+
+(define (room-timeline room-id #!key (limit #f) (offset #f))
+  (let ((tl (get room-id 'timeline)))
+    (if (and limit (<= limit (length tl)))
+        (take tl limit)
+        tl)))
+
+(define *rooms* '())
+
+(define (any-room)
+  (and (pair? *rooms*) (car *rooms*)))
+
+(define (joined-rooms)
+  *rooms*)
 
 
 
@@ -209,20 +248,20 @@
                        "empty-state"
                        (mref '(event_id)
                              (vector-ref events (sub1 (vector-length events)))))))
-    (state-set! state-id state)
-    (last-state-set! room-id state-id)
-    (list state-id state)))
+    (put! room-id 'top-state state)
+    (put! room-id 'bottom-state state)
+    (put! room-id 'timeline '())
+    (push! room-id *rooms*)
+    state))
 
-(define (handle-sync batch #!optional (update-ui #t))
+(define (handle-sync batch)
   (let ((next (mref '(next_batch) batch)))
-    #;(info "[~A] update: ~a~%" (seconds->string) next)
-    (with-transaction db
-      (lambda ()
-        (for-each (cut advance-room <> update-ui) (mref '(rooms join) batch))
-        (config-set! 'next-batch next)))
+    (info "[~A] update: ~a~%" (seconds->string) next)
+    (for-each advance-room (mref '(rooms join) batch))
+    #;(config-set! 'next-batch next)
     next))
 
-(define (advance-room room-data #!optional (update-ui #t))
+(define (advance-room room-data)
   (let* ((room-id (car room-data))
          (limited (mref '(timeline limited) (cdr room-data)))
          (events (mref '(timeline events) (cdr room-data)))
@@ -230,51 +269,33 @@
          (state (mref '(state events) (cdr room-data)))
          (notifs (mref '(unread_notifications notification_count) (cdr room-data)))
          (highlights (mref '(unread_notifications highlight_count) (cdr room-data)))
-         (base-sequence (add1 (branch-last-sequence-number room-id)))
-         (init-ctx (cond ((and (room-exists? room-id) (vector? state) (not (vector-empty? state)))
-                          (let ((id (mref '(event_id)
-                                          (vector-ref state (sub1 (vector-length state)))))
-                                (ctx (vector-fold (lambda (i ctx evt) (update-context ctx evt))
+         (init-ctx (cond ((and (room-exists? room-id)
+                               (vector? state)
+                               (not (vector-empty? state)))
+                          (vector-fold (lambda (i ctx evt) (update-context ctx evt))
                                                   (room-context room-id)
-                                                  state)))
-                            (state-set! id ctx)
-                            (list id ctx)))
+                                                  state))
                          ((room-exists? room-id)
-                          (room-last-state-id-and-state room-id))
+                          (room-context room-id))
                          (else
                            (initialize-room! room-data)))))
     ;; Timeline Hole
     (when limited
-      (info "======= LIMITED~%")
-      (let ((evt-id (sprintf "hole-~A-~A" room-id base-sequence)))
-        (event-set! evt-id
-                    `((type . "com.upyum.ensemble.hole")
-                      (content (from . ,(mref '(timeline prev_batch)
-                                              (cdr room-data))))
-                      (formated . "… some history missing …"))
-                    (car init-ctx))
-        (info "room: ~A seq: ~A evt: ~A~%" room-id base-sequence evt-id)
-        (branch-insert! room-id base-sequence evt-id)
-        (set! base-sequence (add1 base-sequence))))
+      (info "======= LIMITED in ~A~%" room-id)
+      (let* ((prev_batch (mref '(timeline prev_batch) (cdr room-data)))
+             (evt (make-hole-event prev_batch)))
+        (branch-insert! room-id evt)))
     ;; Timeline
     (vector-for-each (lambda (i evt)
-                       (let* ((id+old-ctx init-ctx)
-                              (prev-ctx-id (car id+old-ctx))
-                              (old-ctx (cadr id+old-ctx))
+                       (let* ((old-ctx init-ctx)
                               (new-ctx (update-context old-ctx evt))
                               (evt-id (mref '(event_id) evt)))
-                         (event-set! evt-id
-                                     `((event_id . ,evt-id)
-                                       (formated . ,(print-event evt old-ctx)))
-                                     prev-ctx-id)
                          (when (not (eq? old-ctx new-ctx))
-                           (state-set! evt-id new-ctx)
-                           (set! init-ctx (list evt-id new-ctx)))
-                         (last-state-set! room-id (car init-ctx))
+                           (set! init-ctx new-ctx))
+                         (last-state-set! room-id init-ctx)
                          (branch-insert! room-id
-                                         (+ base-sequence i)
-                                         evt-id)
-                         ))
+                           `((event_id . ,evt-id)
+                             (formated . ,(print-event evt old-ctx))))))
                      events)
     ;; Ephemerals
     (vector-for-each (lambda (i evt)
@@ -307,7 +328,14 @@
 
 (define *requested-holes* '())
 
-(define (fill-hole room-id hole-evt-id hole-id msgs hole)
+(define (make-hole-event from)
+  (let ((evt-id (sprintf "hole-~A" from)))
+    `((event_id . ,evt-id)
+      (type . "com.upyum.ensemble.hole")
+      (content (from . ,from))
+      (formated . "… some history missing …"))))
+
+#;(define (fill-hole room-id hole-evt-id hole-id msgs hole)
   (let* ((incoming-events (mref '(chunk) msgs))
          (new-events (filter-out-known-events! (vector->list incoming-events)))
          (number (+ (length new-events) 2))
@@ -354,6 +382,8 @@
     (set! *requested-holes* (delete! hole *requested-holes*))
     ;; TODO send messages to frontend
     #;(refresh-messageswin)))
+
+(define fill-hole void)
 
 (define (filter-out-known-events! evts)
   (take-while! (lambda (evt) (null? (event-ref (mref '(event_id) evt))))

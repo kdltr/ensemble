@@ -115,16 +115,16 @@ EOF
          (sql db "SELECT last_state FROM branches WHERE id = ?;")
          (sexp->string room-id)))
 
-(define (last-state-set! room-id state-id)
+#;(define (last-state-set! room-id state-id)
   (exec (sql db "INSERT OR REPLACE INTO branches (id, last_state, read_marker) VALUES (?, ?, ?);")
         (sexp->string room-id) (sexp->string state-id) (sexp->string (read-marker-ref room-id))))
 
-(define (read-marker-ref room-id)
+#;(define (read-marker-ref room-id)
   (query fetch-sexp
          (sql db "SELECT read_marker FROM branches WHERE id = ?;")
          (sexp->string room-id)))
 
-(define (read-marker-set! room-id event-id)
+#;(define (read-marker-set! room-id event-id)
   (exec (sql db "UPDATE branches SET read_marker = ? WHERE id = ?;")
         (sexp->string (->string event-id)) (sexp->string room-id)))
 
@@ -137,7 +137,7 @@ EOF
   (exec (sql db "INSERT OR REPLACE INTO events (id, content, context) VALUES (?, ?, ?);")
         (sexp->string id) (sexp->string content) (sexp->string context-id)))
 
-(define (branch-insert! room-id sequence-number event-id)
+#;(define (branch-insert! room-id sequence-number event-id)
   (exec (sql db "INSERT INTO branches_events (branch_id, sequence_number, event_id) VALUES (?, ?, ?);")
         (sexp->string room-id) (sexp->string sequence-number) (sexp->string event-id)))
 
@@ -156,20 +156,20 @@ EOF
          (sql db "SELECT sequence_number FROM branches_events WHERE id = ?;")
          (sexp->string branch-event-id)))
 
-(define (joined-rooms)
+#;(define (joined-rooms)
   (query fetch-column-sexps
          (sql db "SELECT id FROM branches;")))
 
-(define (any-room)
+#;(define (any-room)
   (query fetch-sexp
          (sql db "SELECT id FROM branches LIMIT 1;")))
 
-(define (room-exists? id)
+#;(define (room-exists? id)
   (query fetch-sexp
          (sql db "SELECT id FROM branches WHERE id = ?;")
          (sexp->string id)))
 
-(define (room-timeline id #!key (limit -1) (offset (branch-last-sequence-number id)))
+#;(define (room-timeline id #!key (limit -1) (offset (branch-last-sequence-number id)))
   (let ((tmp (query fetch-rows-sexps
                     (sql db "SELECT events.content, events.context, branches_events.id, events.id
                          FROM branches_events
@@ -205,7 +205,7 @@ EOF
 
 (define room-context-and-id room-last-state-id-and-state)
 
-(define (room-context room-id) (cadr (room-context-and-id room-id)))
+#;(define (room-context room-id) (cadr (room-context-and-id room-id)))
 
 (handle-exceptions exn
   (begin

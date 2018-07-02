@@ -38,7 +38,7 @@
   (except data-structures
           ->string conc string-chop string-split string-translate
           substring=? substring-ci=? substring-index substring-index-ci)
-  ports files posix srfi-1 extras
+  ports files posix srfi-1 extras miscmacros
   defer debug)
 
 (use utf8 utf8-srfi-13 vector-lib uri-common openssl

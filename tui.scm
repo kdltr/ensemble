@@ -64,26 +64,25 @@
 
 (define (refresh-messageswin)
   (let ((timeline (room-timeline (current-room)
-                                 limit: rows
-                                 offset: (room-offset (current-room))))
+                                 limit: rows))
         (read-marker (read-marker-ref (current-room))))
     (werase messageswin)
     (for-each
-      (lambda (evt+ctx)
+      (lambda (evt)
         ;; Visible holes are dynamically loaded
-        (when (equal? (mref '(type) (car evt+ctx))
+        (when (equal? (mref '(type) evt)
                       "com.upyum.ensemble.hole")
-          (let* ((from (mref '(content from) (car evt+ctx)))
+          (let* ((from (mref '(content from) evt))
                  (hole (list (current-room) from)))
             (info "[hole-detected] ~a ~s~%" (current-room) hole)
             (when (not (member hole *requested-holes*))
               (set! *requested-holes* (cons hole *requested-holes*))
-              (defer 'hole-messages request-hole-messages
+              #;(defer 'hole-messages request-hole-messages
                      (current-room) (cadddr evt+ctx) (car evt+ctx) (caddr evt+ctx)
                      rows hole))))
         (maybe-newline)
-        (wprintw messageswin "~A" (mref '(formated) (car evt+ctx)))
-        (when (and read-marker (equal? read-marker (mref '(event_id) (car evt+ctx))))
+        (wprintw messageswin "~A" (mref '(formated) evt))
+        (when (and read-marker (equal? read-marker (mref '(event_id) evt)))
           (maybe-newline)
           (wprintw messageswin "~A" (make-string cols #\-))))
       (reverse timeline))))
@@ -129,7 +128,7 @@
     (lambda (_) (reset)))
   (start-interface)
   (let* ((first-batch (sync since: (config-ref 'next-batch)))
-         (next (handle-sync first-batch #f)))
+         (next (handle-sync first-batch)))
     (switch-room (any-room))
     (defer 'sync sync timeout: 30000 since: next)
     (defer 'input get-input)
