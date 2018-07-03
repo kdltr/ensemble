@@ -220,7 +220,7 @@
          (switch-room (last *highlights*)))))
 
 ;; History down
-(define-key KEY_NPAGE
+#;(define-key KEY_NPAGE
   (let* ((current-offset (room-offset (current-room)))
          (next (events-next (current-room) current-offset 1)))
     (unless (null? next)
@@ -231,7 +231,7 @@
         (refresh-messageswin)))))
 
 ;; History up
-(define-key KEY_PPAGE
+#;(define-key KEY_PPAGE
   (let* ((current-offset (room-offset (current-room)))
          (prev (events-previous (current-room) current-offset 1)))
     (unless (null? prev)

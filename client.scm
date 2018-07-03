@@ -14,16 +14,6 @@
 
 
 
-;; Configuration
-;; =============
-
-(let ((uri (config-ref 'server-uri)))
-  (when uri (init! uri))
-  (access-token (config-ref 'access-token))
-  (mxid (config-ref 'mxid)))
-
-
-
 ;; Utilities
 ;; =========
 
@@ -57,6 +47,16 @@
 
 ;; DB replacement
 ;; ==============
+
+(define (get-config)
+  (read-file (make-pathname (config-home) "config")))
+
+(define (config-ref key)
+  (alist-ref key (get-config)))
+
+(define (config-set! key val)
+  (with-output-to-file (make-pathname (config-home) "config")
+    (lambda () (write (alist-update! key val (get-config))))))
 
 (define (room-exists? id)
   (pair? (symbol-plist id)))
@@ -94,6 +94,16 @@
         (lambda (r) (write `(room ',r ',(symbol-plist r)))
                     (newline))
         *rooms*))))
+
+
+
+;; Configuration
+;; =============
+
+(let ((uri (config-ref 'server-uri)))
+  (when uri (init! uri))
+  (access-token (config-ref 'access-token))
+  (mxid (config-ref 'mxid)))
 
 
 

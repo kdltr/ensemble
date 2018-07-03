@@ -51,7 +51,7 @@
 
 (define *rooms-offset* '())
 
-(define (room-offset room-id)
+#;(define (room-offset room-id)
   (alist-ref room-id *rooms-offset* equal? (branch-last-sequence-number room-id)))
 
 (define (room-offset-set! room-id offset)

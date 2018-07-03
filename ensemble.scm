@@ -17,15 +17,27 @@
 
 
 
+(module locations (config-home)
+(import scheme chicken)
+(use files)
+(define (config-home)
+  (let ((base (or (get-environment-variable "XDG_CONFIG_HOME")
+                  (make-pathname (list (get-environment-variable "HOME")
+                                       ".config")
+                                 #f))))
+    (make-pathname (list base "ensemble") #f))))
+
+
+
 (module backend (init! password-login access-token server-uri mxid
                  config-ref config-set!
                        mref mupdate mdelete
                        sync any-room room-display-name read-marker-ref
-                       room-timeline branch-last-sequence-number
+                       room-timeline
                        request-hole-messages print-event room-exists?
                        room-name json-true? member-displayname room-context
                        joined-rooms handle-sync fill-hole message:emote
-                       events-previous events-next message:text
+                       message:text
                        mark-last-message-as-read room-members
                        *requested-holes* save-db
                        )
@@ -39,16 +51,14 @@
           ->string conc string-chop string-split string-translate
           substring=? substring-ci=? substring-index substring-index-ci)
   ports files posix srfi-1 extras miscmacros
-  defer debug)
+  defer debug locations)
 
 (use utf8 utf8-srfi-13 vector-lib uri-common openssl
      intarweb (except medea read-json) cjson
-     rest-bind (prefix http-client http:)
-     (except sql-de-lite reset))
+     rest-bind (prefix http-client http:))
 
 (define +ensemble-version+ "dev")
 
-(include "db.scm")
 (include "matrix.scm")
 (include "client.scm")
 )
@@ -71,7 +81,6 @@
 (include "tui.scm")
 (include "tui/input.scm")
 )
-
 
 (cond-expand (csi)
       (else
