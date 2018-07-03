@@ -1,1 +1,3 @@
+(compile -s -J -O2 -d0 nonblocking-ports.scm)
+(compile -s -O3 -d0 nonblocking-ports.import.scm)
 (compile ensemble.scm)
