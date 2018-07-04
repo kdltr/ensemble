@@ -9,11 +9,13 @@
 
 
 
-(module defer (defer receive-defered retry
-               thread-join-protected!)
+(module concurrency (defer receive-defered retry
+                     thread-join-protected!
+                     start-worker worker-wait
+                     worker-receive worker-send)
 (import scheme chicken debug srfi-18)
-(use gochan)
-(include "defer.scm"))
+(use gochan posix nonblocking-ports)
+(include "concurrency.scm"))
 
 
 
@@ -51,7 +53,7 @@
           ->string conc string-chop string-split string-translate
           substring=? substring-ci=? substring-index substring-index-ci)
   ports files posix srfi-1 extras miscmacros
-  defer debug locations)
+  concurrency debug locations)
 
 (use utf8 utf8-srfi-13 vector-lib uri-common openssl
      intarweb (except medea read-json) cjson
@@ -76,11 +78,13 @@
           ->string conc string-chop string-split string-translate
           substring=? substring-ci=? substring-index substring-index-ci)
   srfi-1 posix data-structures irregex srfi-18 miscmacros extras
-  defer debug backend)
+  concurrency debug backend)
 (use ioctl ncurses utf8 utf8-srfi-13 utf8-srfi-14 unicode-char-sets)
 (include "tui.scm")
 (include "tui/input.scm")
 )
+
+
 
 (cond-expand (csi)
       (else

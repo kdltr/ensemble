@@ -39,3 +39,41 @@
             (retry exn)
             (values 'no-one #f)))
         (apply values data))))
+
+
+
+;; Worker processes
+;; ================
+
+(define-record worker input output pid)
+
+(define (start-worker thunk)
+  (let*-values (((in1 out1) (create-pipe))
+                ((in2 out2) (create-pipe))
+                ((pid)
+                 (process-fork
+                   (lambda ()
+                     (file-close in1)
+                     (file-close out2)
+                     (current-input-port
+                       (open-input-file*/nonblocking in2))
+                     (current-output-port
+                       (open-output-file*/nonblocking out1))
+                     (thunk))
+                   #t)))
+    (file-close in2)
+    (file-close out1)
+    (make-worker (open-input-file*/nonblocking in1)
+                 (open-output-file*/nonblocking out2)
+                 pid)))
+
+(define (worker-send w msg)
+  (let ((out (worker-output w)))
+    (write msg out)
+    (newline out)))
+
+(define (worker-receive w)
+  (read (worker-input w)))
+
+(define (worker-wait w #!optional (nohang #f))
+  (process-wait (worker-pid w) nohang))
