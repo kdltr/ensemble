@@ -1,3 +1,10 @@
+(module concurrency (defer receive-defered retry
+                     thread-join-protected!
+                     start-worker worker-wait
+                     worker-receive worker-send)
+(import scheme chicken debug srfi-18)
+(use gochan posix nonblocking-ports)
+
 ;; Defering API
 ;; ============
 
@@ -47,7 +54,7 @@
 
 (define-record worker input output pid)
 
-(define (start-worker thunk)
+(define (start-worker proc . args)
   (let*-values (((in1 out1) (create-pipe))
                 ((in2 out2) (create-pipe))
                 ((pid)
@@ -59,7 +66,7 @@
                        (open-input-file*/nonblocking in2))
                      (current-output-port
                        (open-output-file*/nonblocking out1))
-                     (thunk))
+                     (apply proc args))
                    #t)))
     (file-close in2)
     (file-close out1)
@@ -73,7 +80,8 @@
     (newline out)))
 
 (define (worker-receive w)
-  (read (worker-input w)))
+  (list (read (worker-input w)) w))
 
 (define (worker-wait w #!optional (nohang #f))
   (process-wait (worker-pid w) nohang))
+)

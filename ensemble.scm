@@ -1,95 +1,13 @@
-(module debug (info)
-(import scheme chicken extras)
-(cond-expand
-      (debug (define (info fmt . args)
-               (apply fprintf (current-error-port) fmt args)))
-      (else (define-syntax info
-              (syntax-rules ()
-                ((info . rest) (void)))))))
-
-
-
-(module concurrency (defer receive-defered retry
-                     thread-join-protected!
-                     start-worker worker-wait
-                     worker-receive worker-send)
-(import scheme chicken debug srfi-18)
-(use gochan posix nonblocking-ports)
-(include "concurrency.scm"))
-
-
-
-(module locations (config-home)
-(import scheme chicken)
-(use files)
-(define (config-home)
-  (let ((base (or (get-environment-variable "XDG_CONFIG_HOME")
-                  (make-pathname (list (get-environment-variable "HOME")
-                                       ".config")
-                                 #f))))
-    (make-pathname (list base "ensemble") #f))))
-
-
-
-(module backend (init! password-login access-token server-uri mxid
-                 config-ref config-set!
-                       mref mupdate mdelete
-                       sync any-room room-display-name read-marker-ref
-                       room-timeline
-                       request-hole-messages print-event room-exists?
-                       room-name json-true? member-displayname room-context
-                       joined-rooms handle-sync fill-hole message:emote
-                       message:text
-                       mark-last-message-as-read room-members
-                       *requested-holes* save-db
-                       )
-(import
-  (except scheme
-          string-length string-ref string-set! make-string string substring
-          string->list list->string string-fill! write-char read-char display)
-  (except chicken
-          reverse-list->string print print*)
-  (except data-structures
-          ->string conc string-chop string-split string-translate
-          substring=? substring-ci=? substring-index substring-index-ci)
-  ports files posix srfi-1 extras miscmacros
-  concurrency debug locations)
-
-(use utf8 utf8-srfi-13 vector-lib uri-common openssl
-     intarweb (except medea read-json) cjson
-     rest-bind (prefix http-client http:))
-
-(define +ensemble-version+ "dev")
-
-(include "matrix.scm")
-(include "client.scm")
-)
-
-
-
-(module frontend *
-(import
-  (except scheme
-          string-length string-ref string-set! make-string string substring
-          string->list list->string string-fill! write-char read-char display)
-  (except chicken
-          reverse-list->string print print*)
-  (except data-structures
-          ->string conc string-chop string-split string-translate
-          substring=? substring-ci=? substring-index substring-index-ci)
-  srfi-1 posix data-structures irregex srfi-18 miscmacros extras
-  concurrency debug backend)
-(use ioctl ncurses utf8 utf8-srfi-13 utf8-srfi-14 unicode-char-sets)
+(include "debug.scm")
+(include "locations.scm")
+(include "concurrency.scm")
+(include "backend.scm")
 (include "tui.scm")
-(include "tui/input.scm")
-)
-
-
 
 (cond-expand (csi)
       (else
 (module main ()
-(import scheme chicken extras foreign backend frontend)
+(import scheme chicken extras foreign backend tui)
 (use (only uri-common uri->string)
      (only ncurses endwin)
      stty)
@@ -137,4 +55,4 @@
     (signal exn))
   (on-exit endwin)
   (startup))
-)))
+))) ;; main module

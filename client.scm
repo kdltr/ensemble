@@ -1,19 +1,3 @@
-(void)
-
-;; Enable server certificate validation for https URIs.
-(define ((make-ssl-server-connector ctx) uri proxy)
-  (let ((remote-end (or proxy uri)))
-    (if (eq? 'https (uri-scheme remote-end))
-        (ssl-connect (uri-host remote-end)
-                     (uri-port remote-end)
-                     ctx)
-        (http:default-server-connector uri proxy))))
-(http:server-connector
-  (make-ssl-server-connector
-    (ssl-make-client-context* verify?: (not (member "--no-ssl-verify" (command-line-arguments))))))
-
-
-
 ;; Utilities
 ;; =========
 
@@ -49,7 +33,9 @@
 ;; ==============
 
 (define (get-config)
-  (read-file (make-pathname (config-home) "config")))
+  (if (file-exists? "config")
+      (read-file "config")
+      '()))
 
 (define (config-ref key)
   (alist-ref key (get-config)))
@@ -94,16 +80,6 @@
         (lambda (r) (write `(room ',r ',(symbol-plist r)))
                     (newline))
         *rooms*))))
-
-
-
-;; Configuration
-;; =============
-
-(let ((uri (config-ref 'server-uri)))
-  (when uri (init! uri))
-  (access-token (config-ref 'access-token))
-  (mxid (config-ref 'mxid)))
 
 
 

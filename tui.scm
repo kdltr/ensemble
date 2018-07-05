@@ -1,3 +1,20 @@
+(module tui *
+(import
+  (except scheme
+          string-length string-ref string-set! make-string string substring
+          string->list list->string string-fill! write-char read-char display)
+  (except chicken
+          reverse-list->string print print*)
+  (except data-structures
+          ->string conc string-chop string-split string-translate
+          substring=? substring-ci=? substring-index substring-index-ci)
+  srfi-1 posix data-structures irregex srfi-18 miscmacros extras
+  concurrency debug backend)
+(use ioctl ncurses utf8 utf8-srfi-13 utf8-srfi-14 unicode-char-sets
+     sandbox)
+
+(include "tui/input.scm")
+
 (define tty-fileno 0)
 (define rows)
 (define cols)
@@ -140,10 +157,9 @@
   (let ((th (receive-defered)))
     (receive (who datum) (thread-join-protected! th)
       (case who
-        ((sync) (defer 'sync sync timeout: 30000 since: (handle-sync datum)))
         ((input) (handle-input datum) (defer 'input get-input))
+        ((rpc) (handle-rpc (car datum)) (defer 'rpc worker-receive (cadr datum)))
         ((resize) (resize-terminal))
-        ((hole-messages) (apply fill-hole datum))
         (else  (info "Unknown defered procedure: ~a ~s~%" who datum))
          ))
       )
@@ -168,3 +184,8 @@
     (refresh-messageswin)
     (refresh-statuswin)
     (refresh-inputwin)))
+
+(define (handle-rpc exp)
+  (safe-eval exp))
+
+) ;; tui module

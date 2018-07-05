@@ -1,5 +1,7 @@
-(load "ensemble.scm")
-(import frontend backend)
+(load "debug.scm")
+(load "locations.scm")
+(load "concurrency.scm")
+(load "backend.scm")
+(import backend)
 
-(define first-batch (sync))
-(define next (handle-sync first-batch))
+(run "/tmp/profile")
