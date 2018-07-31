@@ -316,15 +316,13 @@
     ;; TODO Ephemerals
     #;(manage-ephemerals ephemerals)
     ;; TODO notifications from backend to frontend
-    #;(when (and update-ui window-dirty (eq? (current-room) room-id))
-      (refresh-messageswin))
-    #;(when (and highlights (> highlights 0) (not (eq? (current-room) room-id)))
-      (set! *highlights* (lset-adjoin eq? *highlights* room-id))
-      (when update-ui (refresh-statuswin) (beep)))
-    #;(when (and notifs (> notifs 0) (not (eq? (current-room) room-id)))
-      (set! *notifications* (lset-adjoin eq? *notifications* room-id))
-      (when update-ui (refresh-statuswin)))
-  ))
+    (when highlights
+      (put! room-id 'highlights highlights)
+      (notify-frontend 'highlights))
+    (when notifs
+      (put! room-id 'notifications notifs)
+      (notify-frontend 'notifications))
+    (notify-frontend 'message)))
 
 
 

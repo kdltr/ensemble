@@ -13,7 +13,7 @@
   (except data-structures
           ->string conc string-chop string-split string-translate
           substring=? substring-ci=? substring-index substring-index-ci)
-  ports files posix srfi-1 extras miscmacros
+  ports files posix srfi-1 extras miscmacros irregex
   concurrency debug locations nonblocking-ports)
 
 (use utf8 utf8-srfi-13 vector-lib uri-common openssl
@@ -69,6 +69,7 @@
   (main-loop))
 
 (define (handle-rpc exp)
+  (set! *frontend-idling* #f)
   (if (eof-object? exp)
       (exit)
       (let ((res (safe-eval exp environment: rpc-env)))
@@ -81,17 +82,58 @@
 ;; RPC Procedures
 ;; ==============
 
+(define *frontend-idling* #f)
+(define *frontend-idle-msgs* '())
+
+(define (notify-frontend type)
+  (if *frontend-idling*
+      (print type)
+      (unless (memv type *frontend-idle-msgs*)
+        (push! type *frontend-idle-msgs*)))
+  (set! *frontend-idling* #f))
+
+(safe-environment-set!
+  rpc-env 'idle
+  (lambda ()
+    (if (null? *frontend-idle-msgs*)
+        (set! *frontend-idling* #t)
+        (pop! *frontend-idle-msgs*))))
+
+
+(define (find-room regex)
+  (define (searched-string ctx)
+    (or (room-name ctx)
+        (json-true? (mref '(("" . m.room.canonical_alias) alias) ctx))
+        (and-let* ((v (json-true? (mref '(("" . m.room.aliases) aliases) ctx))))
+             (vector-ref v 0))
+        (string-join
+         (filter-map (lambda (p)
+                       (and (equal? (cdar p) 'm.room.member)
+                            (or (member-displayname (caar p) ctx)
+                                (caar p))))
+                     ctx))
+        ""))
+  (find (lambda (room-id)
+          (irregex-search (irregex regex 'i)
+                          (searched-string (room-context room-id))))
+        (joined-rooms)))
+
+(safe-environment-set!
+  rpc-env 'find-room find-room)
+
+
 (safe-environment-set!
   rpc-env 'connect
   (lambda ()
-    (defer 'sync sync since: (config-ref 'next-batch))))
+    (defer 'sync sync since: (config-ref 'next-batch))
+    #t))
 
 (safe-environment-set!
   rpc-env 'fetch-events
   (lambda (room-id)
     (let* ((ptr (get room-id 'frontend-pointer))
            (tl (room-timeline room-id))
-           (before after (if ptr (split-timeline tl ptr) (values '() tl))))
+           (_ after (if ptr (split-timeline tl ptr) (values '() tl))))
       (put! room-id 'frontend-pointer (car tl))
       after)))
 
@@ -99,13 +141,40 @@
   rpc-env 'any-room any-room)
 
 (safe-environment-set!
-  rpc-env 'void void)
+  rpc-env 'message:text
+  (lambda (room-id str)
+    (message:text room-id str)
+    #t))
 
 (safe-environment-set!
-  rpc-env 'message:text message:text)
+  rpc-env 'message:emote
+  (lambda (room-id str)
+    (message:emote room-id str)
+    #t))
 
 (safe-environment-set!
-  rpc-env 'message:emote message:emote)
+  rpc-env 'fetch-notifications
+  (lambda ()
+    (filter (lambda (r)
+              (let ((n (get r 'notifications)))
+                (and n (not (zero? n)))))
+            *rooms*)))
+
+(safe-environment-set!
+  rpc-env 'fetch-highlights
+  (lambda ()
+    (filter (lambda (r)
+              (let ((n (get r 'highlights)))
+                (and n (not (zero? n)))))
+            *rooms*)))
+
+(safe-environment-set!
+  rpc-env 'room-name
+  (lambda (room-id)
+    (room-name (room-context room-id))))
+
+(safe-environment-set!
+  rpc-env 'mark-last-message-as-read mark-last-message-as-read)
 
 (run)
 
