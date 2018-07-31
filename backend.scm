@@ -1,3 +1,8 @@
+(include "debug.scm")
+(include "locations.scm")
+(include "nonblocking-ports.scm")
+(include "concurrency.scm")
+
 (module backend (run)
 (import
   (except scheme
@@ -9,21 +14,26 @@
           ->string conc string-chop string-split string-translate
           substring=? substring-ci=? substring-index substring-index-ci)
   ports files posix srfi-1 extras miscmacros
-  concurrency debug locations)
+  concurrency debug locations nonblocking-ports)
 
 (use utf8 utf8-srfi-13 vector-lib uri-common openssl
      intarweb (except medea read-json) cjson
      rest-bind (prefix http-client http:)
-     sandbox)
+     sandbox srfi-71)
 
 (define +ensemble-version+ "dev")
+
+(define rpc-env (make-safe-environment name: 'rpc-environment
+                                       mutable: #f
+                                       extendable: #f))
 
 (include "matrix.scm")
 (include "client.scm")
 
-(define (run base-directory)
-  (create-directory base-directory #t)
-  (change-directory base-directory)
+(define (run)
+  #;(current-error-port (open-output-file "log"))
+  (current-input-port (open-input-file*/nonblocking 0))
+  (current-output-port (open-output-file*/nonblocking 1))
   ;; Enable server certificate validation for https URIs.
   (http:server-connector
     (make-ssl-server-connector
@@ -59,6 +69,44 @@
   (main-loop))
 
 (define (handle-rpc exp)
-  (safe-eval exp))
+  (if (eof-object? exp)
+      (exit)
+      (let ((res (safe-eval exp environment: rpc-env)))
+        (unless (eqv? res (void)) ;; no return value => delayed response
+          (write res)
+          (newline)))))
+
+
+
+;; RPC Procedures
+;; ==============
+
+(safe-environment-set!
+  rpc-env 'connect
+  (lambda ()
+    (defer 'sync sync since: (config-ref 'next-batch))))
+
+(safe-environment-set!
+  rpc-env 'fetch-events
+  (lambda (room-id)
+    (let* ((ptr (get room-id 'frontend-pointer))
+           (tl (room-timeline room-id))
+           (before after (if ptr (split-timeline tl ptr) (values '() tl))))
+      (put! room-id 'frontend-pointer (car tl))
+      after)))
+
+(safe-environment-set!
+  rpc-env 'any-room any-room)
+
+(safe-environment-set!
+  rpc-env 'void void)
+
+(safe-environment-set!
+  rpc-env 'message:text message:text)
+
+(safe-environment-set!
+  rpc-env 'message:emote message:emote)
+
+(run)
 
 ) ;; backend module
