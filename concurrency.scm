@@ -1,9 +1,10 @@
 (module concurrency (defer receive-defered retry
                      thread-join-protected!
                      start-worker worker-wait
-                     worker-receive worker-send)
-(import scheme chicken debug srfi-18)
-(use gochan posix nonblocking-ports)
+                     worker-receive worker-send
+                     worker-name)
+(import scheme chicken debug srfi-18 nonblocking-ports)
+(use gochan posix)
 
 ;; Defering API
 ;; ============
@@ -52,9 +53,9 @@
 ;; Worker processes
 ;; ================
 
-(define-record worker input output pid)
+(define-record worker name input output pid)
 
-(define (start-worker proc . args)
+(define (start-worker name proc . args)
   (let*-values (((in1 out1) (create-pipe))
                 ((in2 out2) (create-pipe))
                 ((pid)
@@ -62,25 +63,28 @@
                    (lambda ()
                      (file-close in1)
                      (file-close out2)
-                     (current-input-port
+                     (duplicate-fileno in2 0)
+                     (duplicate-fileno out1 1)
+                     #;(current-input-port
                        (open-input-file*/nonblocking in2))
-                     (current-output-port
+                     #;(current-output-port
                        (open-output-file*/nonblocking out1))
                      (apply proc args))
                    #t)))
     (file-close in2)
     (file-close out1)
-    (make-worker (open-input-file*/nonblocking in1)
+    (make-worker name
+                 (open-input-file*/nonblocking in1)
                  (open-output-file*/nonblocking out2)
                  pid)))
 
-(define (worker-send w msg)
+(define (worker-send w . msg)
   (let ((out (worker-output w)))
-    (write msg out)
+    (write `(,(car msg) ,@(map (lambda (o) (list 'quote o)) (cdr msg))) out)
     (newline out)))
 
 (define (worker-receive w)
-  (list (read (worker-input w)) w))
+  (values (read (worker-input w)) w))
 
 (define (worker-wait w #!optional (nohang #f))
   (process-wait (worker-pid w) nohang))

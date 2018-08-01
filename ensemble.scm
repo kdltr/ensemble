@@ -1,20 +1,32 @@
 (include "debug.scm")
 (include "locations.scm")
+(include "nonblocking-ports.scm")
 (include "concurrency.scm")
-(include "backend.scm")
-(include "tui.scm")
+(include "tui/base.scm")
 
-(cond-expand (csi)
+(module main ()
+(import foreign tui ncurses chicken scheme)
+
+(foreign-declare "#include <locale.h>")
+(foreign-code "setlocale(LC_ALL, \"C.UTF-8\");")
+
+(handle-exceptions exn
+  (begin
+    (on-exit void)
+    ;; Disable ncurses before printing the error message and call trace
+    (endwin)
+    (print exn)
+    (signal exn))
+  (on-exit endwin)
+  (run)))
+
+#;(cond-expand (csi)
       (else
 (module main ()
 (import scheme chicken extras foreign backend tui)
 (use (only uri-common uri->string)
      (only ncurses endwin)
      stty)
-
-(foreign-declare "#include <locale.h>")
-(foreign-code "setlocale(LC_ALL, \"C.UTF-8\");")
-
 (cond-expand
       (debug (enable-warnings #t)
              (let* ((tty (get-environment-variable "DEBUG_TTY"))
@@ -46,13 +58,4 @@
 (unless (and (server-uri) (access-token) (mxid))
   (prompt-credentials))
 
-(handle-exceptions exn
-  (begin
-    (on-exit void)
-    ;; Disable ncurses before printing the error message and call trace
-    (endwin)
-    (print exn)
-    (signal exn))
-  (on-exit endwin)
-  (startup))
 ))) ;; main module

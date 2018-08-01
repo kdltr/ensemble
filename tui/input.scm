@@ -120,7 +120,7 @@
 (define-key (KEY_END #\x05) ;; C-e
   (move-cursor 'right))
 
-(define-key #\tab
+#;(define-key #\tab
   (unless (equal? input-string "")
     (let* ((members (remove (lambda (o)
                               (equal? (string-downcase (mxid))
@@ -153,7 +153,7 @@
         ((char=? (string-ref input-string 0) #\/)
          (handle-command input-string))
         (else
-          (message:text (current-room) input-string)))
+          (worker-send worker 'message:text (current-room) input-string)))
   (set! input-string "")
   (move-cursor 'left))
 
@@ -269,8 +269,7 @@
           (switch-room (find-room (string-join args))))))
 
 (define-command me args
-  (message:emote (current-room) (string-join args " ")))
+  (worker-send worker 'message:emote (current-room) (string-join args " ")))
 
 (define-command (exit quit) args
-  (save-db)
   (exit))

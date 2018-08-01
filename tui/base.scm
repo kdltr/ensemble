@@ -1,4 +1,4 @@
-(module tui *
+(module tui (run)
 (import
   (except scheme
           string-length string-ref string-set! make-string string substring
@@ -8,10 +8,9 @@
   (except data-structures
           ->string conc string-chop string-split string-translate
           substring=? substring-ci=? substring-index substring-index-ci)
-  srfi-1 posix data-structures irregex srfi-18 miscmacros extras
-  concurrency debug backend)
-(use ioctl ncurses utf8 utf8-srfi-13 utf8-srfi-14 unicode-char-sets
-     sandbox)
+  posix data-structures irregex srfi-18 miscmacros extras
+  concurrency debug locations)
+(use srfi-1 ioctl ncurses utf8 utf8-srfi-13 utf8-srfi-14 unicode-char-sets)
 
 (include "tui/input.scm")
 
@@ -21,6 +20,89 @@
 (define inputwin)
 (define statuswin)
 (define messageswin)
+
+(define worker)
+(define *stored-defered* '())
+
+(define (rpc . args)
+  (info "Sending RPC: ~s" args)
+  (apply worker-send worker args)
+  (let lp ((res (worker-receive worker)))
+    (cond ((eof-object? res)
+           (error "backend stopped"))
+          ((eqv? res 'stopped)
+           (lp (worker-receive worker)))
+          (else
+            (info "Got response from RPC: ~s" res)
+            res))))
+
+(define current-room (make-parameter #f))
+
+(define *notifications* '())
+(define *highlights* '())
+
+(define *rooms-offset* '())
+
+
+;; DB Replacement
+;; ==============
+
+(define (room-exists? id)
+  (get id 'timeline))
+
+(define (room-timeline room-id)
+  (or (get room-id 'timeline) '()))
+
+(define (branch-last-sequence-number _) 0)
+
+(define (room-display-name id)
+  (rpc 'room-display-name id))
+
+(define (mark-last-message-as-read id)
+  (rpc 'mark-last-message-as-read id))
+
+(define (find-room rexp)
+  (rpc 'find-room rexp))
+
+;; Helper procedures
+;; =================
+
+(define (json-false? o)
+  (or (equal? o #f)
+      (equal? o 'null)
+      (equal? o "")
+      (equal? o 0)))
+
+(define (json-true? o)
+  (and (not (json-false? o)) o))
+
+(define (mref keys alist)
+  (if (null? keys)
+      alist
+      (and-let* ((o (alist-ref (car keys) alist equal?)))
+           (mref (cdr keys) o))))
+
+(define (mupdate keys val alist)
+  (if (null? (cdr keys))
+      (alist-update (car keys) val alist equal?)
+      (alist-update (car keys)
+                    (mupdate (cdr keys) val (or (alist-ref (car keys) alist) '()))
+                    alist
+                    equal?)))
+
+(define (mdelete keys alist)
+  (if (null? (cdr keys))
+      (alist-delete (car keys) alist equal?)
+      (alist-update (car keys)
+                    (mdelete (cdr keys) (or (alist-ref (car keys) alist) '()))
+                    alist
+                    equal?)))
+
+
+
+
+;; TUI
+;; ===
 
 (define (start-interface)
   ;; Make ncurses wait less time when receiving an ESC character
@@ -42,21 +124,16 @@
   (init_pair 1 COLOR_BLACK COLOR_WHITE)
   (init_pair 2 COLOR_RED COLOR_WHITE)
   (wbkgdset statuswin (COLOR_PAIR 1))
-  (wprintw messageswin "Loading…")
+  (wprintw messageswin "Loading…~%")
   (wrefresh messageswin)
   )
-
-(define current-room (make-parameter #f))
-
-(define *notifications* '())
-(define *highlights* '())
 
 (define (waddstr* win str)
   (handle-exceptions exn #t
     (waddstr win str)))
 
 (define (refresh-statuswin)
-  (let* ((regular-notifs (lset-difference eq? *notifications* *highlights*))
+  (let* ((regular-notifs (lset-difference eqv? *notifications* *highlights*))
          (highlights-names (map room-display-name *highlights*))
          (notifs-names (map room-display-name regular-notifs)))
     (werase statuswin)
@@ -66,9 +143,7 @@
     (wcolor_set statuswin 1 #f) ;; regular foreground
     (waddstr* statuswin (sprintf "~a" (string-join notifs-names " ")))))
 
-(define *rooms-offset* '())
-
-#;(define (room-offset room-id)
+(define (room-offset room-id)
   (alist-ref room-id *rooms-offset* equal? (branch-last-sequence-number room-id)))
 
 (define (room-offset-set! room-id offset)
@@ -80,20 +155,12 @@
     (alist-delete! room-id *rooms-offset* equal?)))
 
 (define (refresh-messageswin)
-  (let ((timeline (room-timeline (current-room)
-                                 limit: rows))
-        (read-marker (read-marker-ref (current-room))))
+  (let ((timeline (room-timeline (current-room)))
+        (read-marker #f #;(read-marker-ref (current-room))))
     (werase messageswin)
     (for-each
       (lambda (evt)
         ;; Visible holes are dynamically loaded
-        (when (equal? (mref '(type) evt)
-                      "com.upyum.ensemble.hole")
-          (info "[hole-detected] ~a ~s~%" (current-room) evt)
-          (when (not (member evt *requested-holes*))
-            (set! *requested-holes* (cons evt *requested-holes*))
-            (defer 'hole-messages request-hole-messages
-                   (current-room) evt rows)))
         (maybe-newline)
         (wprintw messageswin "~A" (mref '(formated) evt))
         (when (and read-marker (equal? read-marker (mref '(event_id) evt)))
@@ -106,48 +173,41 @@
     (unless (zero? c) (wprintw messageswin "~%"))))
 
 (define (switch-room room-id)
-  (let ((room (room-exists? room-id)))
-    (if room
-        (begin
-          (current-room room-id)
-          (set! *notifications* (delete! room-id *notifications* eq?))
-          (set! *highlights* (delete! room-id *highlights* eq?))
-          (refresh-statuswin)
-          (refresh-messageswin)
-          )
-        #f)))
+  (if room-id
+      (begin
+        (current-room room-id)
+        (advance-timeline)
+        (refresh-statuswin)
+        (refresh-messageswin)
+        )
+      #f))
 
-(define (find-room regex)
-  (define (searched-string ctx)
-    (or (room-name ctx)
-        (json-true? (mref '(("" . m.room.canonical_alias) alias) ctx))
-        (and-let* ((v (json-true? (mref '(("" . m.room.aliases) aliases) ctx))))
-             (vector-ref v 0))
-        (string-join
-         (filter-map (lambda (p)
-                       (and (equal? (cdar p) 'm.room.member)
-                            (or (member-displayname (caar p) ctx)
-                                (caar p))))
-                     ctx))
-        ""))
-  (find (lambda (room-id)
-          (irregex-search (irregex regex 'i)
-                          (searched-string (room-context room-id))))
-        (joined-rooms)))
 
-(define (startup)
+(define (run)
   (set! (signal-handler signal/winch)
     (lambda (_) (defer 'resize (lambda () #t))))
   (set! (signal-handler signal/int)
     (lambda (_) (reset)))
+  (current-error-port (open-output-file "frontend.log"))
   (start-interface)
-  (let* ((first-batch (sync since: (config-ref 'next-batch)))
-         (next (handle-sync first-batch)))
-    (switch-room (any-room))
-    (defer 'sync sync timeout: 30000 since: next)
-    (defer 'input get-input)
-    (refresh-statuswin)
-    (main-loop)))
+  (wprintw messageswin "Starting backend…~%")
+  (wrefresh messageswin)
+  (set! worker (start-worker 'default
+                             (lambda ()
+                               #;(change-directory (config-home))
+                               (process-execute "/my/work/ensemble/backend")
+                               )))
+  (wprintw messageswin "Connecting…~%")
+  (wrefresh messageswin)
+  (unless (rpc 'connect)
+    (error "could not connect"))
+  (current-room (rpc 'any-room))
+  (wprintw messageswin "Starting main loop…~%")
+  (wrefresh messageswin)
+  (defer 'input get-input)
+  (defer 'idle (lambda () (worker-receive worker)))
+  (refresh-statuswin)
+  (main-loop))
 
 (define (main-loop)
   (wnoutrefresh messageswin)
@@ -157,11 +217,14 @@
   (let ((th (receive-defered)))
     (receive (who datum) (thread-join-protected! th)
       (case who
-        ((input) (handle-input datum) (defer 'input get-input))
-        ((rpc) (handle-rpc (car datum)) (defer 'rpc worker-receive (cadr datum)))
-        ((resize) (resize-terminal))
-        (else  (info "Unknown defered procedure: ~a ~s~%" who datum))
-         ))
+        ((idle)
+         (handle-idle-response datum)
+         (worker-send worker 'idle)
+         (defer 'idle (lambda () (worker-receive worker))))
+        (else
+          (worker-send worker 'stop)
+          (push! (list who datum) *stored-defered*))
+        ))
       )
   (main-loop))
 
@@ -185,7 +248,42 @@
     (refresh-statuswin)
     (refresh-inputwin)))
 
-(define (handle-rpc exp)
-  (safe-eval exp))
+(define (handle-defered who datum)
+  (info "Running defered: ~s ~s" who datum)
+  (case who
+    ((input) (handle-input datum) (defer 'input get-input))
+    ((resize) (resize-terminal))
+    (else  (info "Unknown defered procedure: ~a ~s~%" who datum))))
+
+(define (handle-idle-response type)
+  (info "Got an idle notification: ~s" type)
+  (if (eof-object? exp)
+      (handle-backend-disconnection worker)
+      (case type
+        ((message) (advance-timeline))
+        ((notifications)
+         (set! *notifications* (rpc 'fetch-notifications))
+         (refresh-statuswin))
+        ((highlights)
+         (set! *highlights* (rpc 'fetch-highlights))
+         (refresh-statuswin))
+        ((stopped)
+         (for-each
+           (lambda (args) (apply handle-defered args))
+           *stored-defered*)
+         (set! *stored-defered* '()))
+        (else (info "unknown idle response: ~a" type))
+        )))
+
+(define (handle-backend-disconnection worker)
+  (exit))
+
+(define (advance-timeline)
+  (put! (current-room)
+        'timeline
+        (append (rpc 'fetch-events (current-room))
+                (room-timeline (current-room))))
+  (refresh-messageswin))
+
 
 ) ;; tui module
