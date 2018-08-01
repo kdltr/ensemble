@@ -31,7 +31,7 @@
 (include "client.scm")
 
 (define (run)
-  #;(current-error-port (open-output-file "log"))
+  (current-error-port (open-output-file "backend.log"))
   (current-input-port (open-input-file*/nonblocking 0))
   (current-output-port (open-output-file*/nonblocking 1))
   ;; Enable server certificate validation for https URIs.
@@ -69,11 +69,13 @@
   (main-loop))
 
 (define (handle-rpc exp)
+  (info "received: ~s" exp)
   (set! *frontend-idling* #f)
   (if (eof-object? exp)
       (exit)
       (let ((res (safe-eval exp environment: rpc-env)))
-        (unless (eqv? res (void)) ;; no return value => delayed response
+        (unless (eqv? res +delayed-reply-marker+)
+          (info "replied: ~s" res)
           (write res)
           (newline)))))
 
@@ -84,10 +86,13 @@
 
 (define *frontend-idling* #f)
 (define *frontend-idle-msgs* '())
+(define +delayed-reply-marker+ (gensym 'delayed-reply))
 
 (define (notify-frontend type)
   (if *frontend-idling*
-      (print type)
+      (begin
+        (info "replied: ~s" type)
+        (print type))
       (unless (memv type *frontend-idle-msgs*)
         (push! type *frontend-idle-msgs*)))
   (set! *frontend-idling* #f))
@@ -96,8 +101,13 @@
   rpc-env 'idle
   (lambda ()
     (if (null? *frontend-idle-msgs*)
-        (set! *frontend-idling* #t)
+        (begin
+          (set! *frontend-idling* #t)
+          +delayed-reply-marker+)
         (pop! *frontend-idle-msgs*))))
+
+(safe-environment-set!
+  rpc-env 'stop (lambda () 'stopped))
 
 
 (define (find-room regex)
@@ -125,8 +135,9 @@
 (safe-environment-set!
   rpc-env 'connect
   (lambda ()
-    (defer 'sync sync since: (config-ref 'next-batch))
-    #t))
+    (let ((next-batch (sync since: (config-ref 'next-batch))))
+      (defer 'sync sync timeout: 30000 since: (handle-sync next-batch))
+      #t)))
 
 (safe-environment-set!
   rpc-env 'fetch-events
@@ -169,13 +180,13 @@
             *rooms*)))
 
 (safe-environment-set!
-  rpc-env 'room-name
-  (lambda (room-id)
-    (room-name (room-context room-id))))
+  rpc-env 'room-display-name room-display-name)
 
 (safe-environment-set!
-  rpc-env 'mark-last-message-as-read mark-last-message-as-read)
+  rpc-env 'mark-last-message-as-read
+  (lambda (id)
+    (mark-last-message-as-read id)
+    #t))
 
 (run)
-
 ) ;; backend module
