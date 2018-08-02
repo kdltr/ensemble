@@ -15,7 +15,7 @@
     (on-exit void)
     ;; Disable ncurses before printing the error message and call trace
     (endwin)
-    (print exn)
+    (fprintf (current-error-port) "Exception caught: ~s" exn)
     (signal exn))
   (on-exit endwin)
   (run)))

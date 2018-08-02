@@ -268,7 +268,6 @@
                        state
                        state-events)))
 
-;; TODO
 (define (manage-ephemerals room-id ephemerals)
   (vector-for-each (lambda (i evt)
                      (when (equal? (mref '(type) evt) "m.receipt")
@@ -314,9 +313,7 @@
       (put! room-id 'timeline new-timeline)
       (put! room-id 'bottom-state new-state))
 
-    ;; TODO Ephemerals
     (manage-ephemerals room-id ephemerals)
-    ;; TODO notifications from backend to frontend
     (when highlights
       (put! room-id 'highlights highlights)
       (notify-frontend 'highlights))

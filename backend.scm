@@ -68,16 +68,29 @@
       )))
   (main-loop))
 
+(define +delayed-reply-marker+ (gensym 'delayed-reply))
+(define +error-marker+ (gensym 'error))
+
 (define (handle-rpc exp)
   (info "received: ~s" exp)
   (set! *frontend-idling* #f)
   (if (eof-object? exp)
       (exit)
-      (let ((res (safe-eval exp environment: rpc-env)))
-        (unless (eqv? res +delayed-reply-marker+)
-          (info "replied: ~s" res)
-          (write res)
-          (newline)))))
+      (let (((values first . rest) (handle-exceptions exn
+                                     (values +error-marker+ exn)
+                                     (safe-eval exp environment: rpc-env))))
+        (unless (eqv? first +delayed-reply-marker+)
+          (let ((response (if (eqv? first +error-marker+)
+                              (list 'error (exception->string (car rest)))
+                              (cons* 'values first rest))))
+            (info "replied: ~s" response)
+            (write response)
+            (newline))))))
+
+(define (exception->string exn)
+  (with-output-to-string
+    (lambda ()
+      (print-error-message exn (current-output-port) "Backend error"))))
 
 
 
@@ -86,7 +99,6 @@
 
 (define *frontend-idling* #f)
 (define *frontend-idle-msgs* '())
-(define +delayed-reply-marker+ (gensym 'delayed-reply))
 
 (define (notify-frontend type)
   (if *frontend-idling*
@@ -104,10 +116,17 @@
         (begin
           (set! *frontend-idling* #t)
           +delayed-reply-marker+)
-        (pop! *frontend-idle-msgs*))))
+        (begin
+          (write (pop! *frontend-idle-msgs*))
+          (newline)
+          +delayed-reply-marker+))))
 
 (safe-environment-set!
-  rpc-env 'stop (lambda () 'stopped))
+  rpc-env 'stop
+  (lambda ()
+    (write 'stopped)
+    (newline)
+    +delayed-reply-marker+))
 
 
 (define (find-room regex)

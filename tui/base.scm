@@ -10,7 +10,10 @@
           substring=? substring-ci=? substring-index substring-index-ci)
   posix data-structures irregex srfi-18 miscmacros extras
   concurrency debug locations)
-(use srfi-1 ioctl ncurses utf8 utf8-srfi-13 utf8-srfi-14 unicode-char-sets)
+(use srfi-1 ioctl ncurses utf8 utf8-srfi-13 utf8-srfi-14 unicode-char-sets files
+     srfi-71)
+
+;; TODO Separate info log and errors in two different ports
 
 (include "tui/input.scm")
 
@@ -28,13 +31,21 @@
   (info "Sending RPC: ~s" args)
   (apply worker-send worker args)
   (let lp ((res (worker-receive worker)))
+    (info "RECEIVING ~s" res)
     (cond ((eof-object? res)
            (error "backend stopped"))
           ((eqv? res 'stopped)
            (lp (worker-receive worker)))
-          (else
+          ((not (pair? res))
+           (error "Strange RPC response" res))
+          ((eqv? (car res) 'error)
+           (error "Error from backend" (cadr res)))
+          ((eqv? (car res) 'values)
             (info "Got response from RPC: ~s" res)
-            res))))
+            (apply values (cdr res)))
+          (else
+            (error "Strange RPC response" res))
+    )))
 
 (define current-room (make-parameter #f))
 
@@ -146,7 +157,6 @@
     (werase messageswin)
     (for-each
       (lambda (evt)
-        ;; Visible holes are dynamically loaded
         (maybe-newline)
         (wprintw messageswin "~A" (mref '(formated) evt))
         (when (and read-marker (equal? read-marker (mref '(event_id) evt)))
@@ -177,11 +187,13 @@
   (start-interface)
   (wprintw messageswin "Starting backend…~%")
   (wrefresh messageswin)
-  (set! worker (start-worker 'default
-                             (lambda ()
-                               #;(change-directory (config-home))
-                               (process-execute "/my/work/ensemble/backend")
-                               )))
+  (set! worker
+    (start-worker 'default
+      (lambda ()
+        (let ((profile-dir (make-pathname (config-home) "default")))
+          (create-directory profile-dir #t)
+          (change-directory profile-dir)
+          (process-execute "/my/work/ensemble/backend")))))
   (wprintw messageswin "Connecting…~%")
   (wrefresh messageswin)
   (unless (rpc 'connect)
@@ -189,23 +201,30 @@
   (current-room (rpc 'find-room "test"))
   (wprintw messageswin "Starting main loop…~%")
   (wrefresh messageswin)
+  (refresh-messageswin)
+  (refresh-statuswin)
   (defer 'input get-input)
   (defer 'idle (lambda () (worker-receive worker)))
-  (refresh-statuswin)
   (main-loop))
 
 (define (main-loop)
+  (info "MAIN LOOP")
   (wnoutrefresh messageswin)
   (wnoutrefresh statuswin)
   (wnoutrefresh inputwin)
   (doupdate)
   (let ((th (receive-defered)))
     (receive (who datum) (thread-join-protected! th)
+      (info "DEFERED: ~s ~s" who datum)
       (case who
         ((idle)
          (handle-idle-response datum)
          (worker-send worker 'idle)
          (defer 'idle (lambda () (worker-receive worker))))
+        ((input)
+         (worker-send worker 'stop)
+         (push! (list who datum) *stored-defered*)
+         (defer 'input get-input))
         (else
           (worker-send worker 'stop)
           (push! (list who datum) *stored-defered*))
@@ -237,7 +256,7 @@
   (info "Running defered: ~s ~s" who datum)
   (case who
     ;; FIXME input freezes at some point
-    ((input) (handle-input datum) (defer 'input get-input))
+    ((input) (handle-input datum))
     ((resize) (resize-terminal))
     (else  (info "Unknown defered procedure: ~a ~s~%" who datum))))
 
