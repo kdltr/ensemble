@@ -208,10 +208,14 @@
       (delete-word-right))))
 
 (define-key #(#\escape #\n)
-  (cond ((not (null? *highlights*))
-         (switch-room (car *highlights*)))
-        ((not (null? *notifications*))
-         (switch-room (car *notifications*)))))
+  (let* ((notifs (append *highlights* *notifications*))
+         (inside (memv (current-room) notifs)))
+    (unless (null? notifs)
+      (if inside
+          (if (null? (cdr inside))
+              (switch-room (car notifs))
+              (switch-room (cadr inside)))
+          (switch-room (car notifs))))))
 
 (define-key #\x0e ;; C-n
   (cond ((not (null? *notifications*))
