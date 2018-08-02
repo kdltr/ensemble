@@ -269,7 +269,7 @@
                        state-events)))
 
 ;; TODO
-#;(define (manage-ephemerals ephemerals)
+(define (manage-ephemerals room-id ephemerals)
   (vector-for-each (lambda (i evt)
                      (when (equal? (mref '(type) evt) "m.receipt")
                        (let ((datum (mref '(content) evt)))
@@ -315,7 +315,7 @@
       (put! room-id 'bottom-state new-state))
 
     ;; TODO Ephemerals
-    #;(manage-ephemerals ephemerals)
+    (manage-ephemerals room-id ephemerals)
     ;; TODO notifications from backend to frontend
     (when highlights
       (put! room-id 'highlights highlights)

@@ -184,5 +184,11 @@
     (mark-last-message-as-read id)
     #t))
 
+(safe-environment-set!
+  rpc-env 'read-marker
+  (lambda (id)
+    (let ((marker (read-marker-ref id)))
+      (and marker (symbol->string marker)))))
+
 (run)
 ) ;; backend module

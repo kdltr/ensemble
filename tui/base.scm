@@ -142,7 +142,7 @@
 
 (define (refresh-messageswin)
   (let ((timeline (rpc 'fetch-events (current-room) rows))
-        (read-marker #f #;(read-marker-ref (current-room))))
+        (read-marker (rpc 'read-marker (current-room))))
     (werase messageswin)
     (for-each
       (lambda (evt)
