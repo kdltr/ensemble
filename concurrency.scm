@@ -3,7 +3,7 @@
                      start-worker worker-wait
                      worker-receive worker-send
                      worker-name)
-(import scheme chicken debug srfi-18 nonblocking-ports)
+(import scheme chicken debug srfi-18 nonblocking-ports srfi-71)
 (use gochan posix)
 
 ;; Defering API
@@ -56,21 +56,20 @@
 (define-record worker name input output pid)
 
 (define (start-worker name proc . args)
-  (let*-values (((in1 out1) (create-pipe))
-                ((in2 out2) (create-pipe))
-                ((pid)
-                 (process-fork
-                   (lambda ()
-                     (file-close in1)
-                     (file-close out2)
-                     (duplicate-fileno in2 0)
-                     (duplicate-fileno out1 1)
-                     #;(current-input-port
-                       (open-input-file*/nonblocking in2))
-                     #;(current-output-port
-                       (open-output-file*/nonblocking out1))
-                     (apply proc args))
-                   #t)))
+  (let* ((in1 out1 (create-pipe))
+         (in2 out2 (create-pipe))
+         (pid (process-fork
+                (lambda ()
+                  (file-close in1)
+                  (file-close out2)
+                  (duplicate-fileno in2 0)
+                  (duplicate-fileno out1 1)
+                  #;(current-input-port
+                    (open-input-file*/nonblocking in2))
+                  #;(current-output-port
+                    (open-output-file*/nonblocking out1))
+                  (apply proc args))
+                  #t)))
     (file-close in2)
     (file-close out1)
     (make-worker name

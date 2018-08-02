@@ -339,15 +339,14 @@
 
 (define (fill-hole room-id hole-evt msgs)
   (info "[fill-hole] ~a ~a~%" room-id hole-evt)
-  (let*-values (((timeline) (room-timeline room-id))
-                ((before-hole after-hole) (split-timeline timeline hole-evt))
-                ((hole-state) (mref '(content state) hole-evt))
-                ((events) (filter-out-known-events
-                            (reverse (vector->list (mref '(chunk) msgs)))
-                            (if (pair? before-hole) (car before-hole) '())))
-                ((new-timeline new-state)
-                 ((advance-timeline (list->vector events)) before-hole hole-state))
-                 )
+  (let* ((timeline (room-timeline room-id))
+         (before-hole after-hole (split-timeline timeline hole-evt))
+         (hole-state (mref '(content state) hole-evt))
+         (events (filter-out-known-events
+                  (reverse (vector->list (mref '(chunk) msgs)))
+                  (if (pair? before-hole) (car before-hole) '())))
+         (new-timeline new-state
+          ((advance-timeline (list->vector events)) before-hole hole-state)))
     ;; FIXME the state handling is wrong (have to rewind with prev_content)
     ;; TODO add new hole with msgs.end if chunk is not empty
     (put! room-id 'timeline (append after-hole new-timeline))

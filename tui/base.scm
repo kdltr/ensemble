@@ -14,6 +14,7 @@
      srfi-71)
 
 ;; TODO Separate info log and errors in two different ports
+;; FIXME Input get scrambled when typing fast / pasting text
 
 (include "tui/input.scm")
 
@@ -165,7 +166,7 @@
       (reverse timeline))))
 
 (define (maybe-newline)
-  (let-values (((l c) (getyx messageswin)))
+  (let ((l c (getyx messageswin)))
     (unless (zero? c) (wprintw messageswin "~%"))))
 
 (define (switch-room room-id)
@@ -214,23 +215,22 @@
   (wnoutrefresh statuswin)
   (wnoutrefresh inputwin)
   (doupdate)
-  (let ((th (receive-defered)))
-    (receive (who datum) (thread-join-protected! th)
-      (info "DEFERED: ~s ~s" who datum)
-      (case who
-        ((idle)
-         (handle-idle-response datum)
-         (worker-send worker 'idle)
-         (defer 'idle (lambda () (worker-receive worker))))
-        ((input)
-         (worker-send worker 'stop)
-         (push! (list who datum) *stored-defered*)
-         (defer 'input get-input))
-        (else
-          (worker-send worker 'stop)
-          (push! (list who datum) *stored-defered*))
-        ))
-      )
+  (let* ((th (receive-defered))
+         (who datum (thread-join-protected! th)))
+    (info "DEFERED: ~s ~s" who datum)
+    (case who
+      ((idle)
+       (handle-idle-response datum)
+       (worker-send worker 'idle)
+       (defer 'idle (lambda () (worker-receive worker))))
+      ((input)
+       (worker-send worker 'stop)
+       (push! (list who datum) *stored-defered*)
+       (defer 'input get-input))
+      (else
+        (worker-send worker 'stop)
+        (push! (list who datum) *stored-defered*))
+      ))
   (main-loop))
 
 (define (get-input)

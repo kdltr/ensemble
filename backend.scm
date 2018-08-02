@@ -58,14 +58,14 @@
     (mxid (config-ref 'mxid))))
 
 (define (main-loop)
-  (let ((th (receive-defered)))
-    (receive (who datum) (thread-join-protected! th)
-      (case who
-        ((sync) (defer 'sync sync timeout: 30000 since: (handle-sync datum)))
-        ((rpc) (handle-rpc datum) (defer 'rpc read))
-        ((hole-messages) (apply fill-hole datum))
-        (else  (info "Unknown defered procedure: ~a ~s~%" who datum))
-      )))
+  (let* ((th (receive-defered))
+         (who datum (thread-join-protected! th)))
+    (case who
+      ((sync) (defer 'sync sync timeout: 30000 since: (handle-sync datum)))
+      ((rpc) (handle-rpc datum) (defer 'rpc read))
+      ((hole-messages) (apply fill-hole datum))
+      (else  (info "Unknown defered procedure: ~a ~s~%" who datum))
+      ))
   (main-loop))
 
 (define +delayed-reply-marker+ (gensym 'delayed-reply))

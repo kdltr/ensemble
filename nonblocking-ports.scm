@@ -3,7 +3,7 @@
 (module nonblocking-ports (open-input-file*/nonblocking
                            open-output-file*/nonblocking)
 (import scheme chicken foreign ports)
-(use posix srfi-18)
+(use posix srfi-18 srfi-71)
 
 (define ((fd-read-char fd))
   (thread-wait-for-i/o! fd #:input)
@@ -13,9 +13,8 @@
         (string-ref (car str+len) 0))))
 
 (define ((input-char-ready? fd))
-  (call-with-values
-    (lambda () (file-select fd #f 0))
-    (lambda (r _) r)))
+  (let ((r _ (file-select fd #f 0)))
+    r))
 
 (define (open-input-file*/nonblocking fd)
   (make-input-port (fd-read-char fd)
