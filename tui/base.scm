@@ -251,6 +251,7 @@
 (define (handle-defered who datum)
   (info "Running defered: ~s ~s" who datum)
   (case who
+    ;; FIXME input freezes at some point
     ((input) (handle-input datum) (defer 'input get-input))
     ((resize) (resize-terminal))
     (else  (info "Unknown defered procedure: ~a ~s~%" who datum))))

@@ -2,7 +2,8 @@
 ;; =========
 
 (define (mark-last-message-as-read room-id)
-  (let* ((last-evt (room-timeline room-id limit: 1))
+  (let* ((tl (room-timeline room-id limit: 1))
+         (last-evt (if (pair? tl) (car tl) '()))
          (evt-id (mref '(event_id) last-evt)))
     (when evt-id
       (room-mark-read room-id evt-id))))
