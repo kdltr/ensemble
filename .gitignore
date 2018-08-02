@@ -1,3 +1,5 @@
-config.scm
+config
 *.so
 ensemble
+backend
+*.log
