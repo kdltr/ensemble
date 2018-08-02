@@ -47,22 +47,8 @@
 ;; DB Replacement
 ;; ==============
 
-(define (room-exists? id)
-  (get id 'timeline))
-
-(define (room-timeline room-id)
-  (or (get room-id 'timeline) '()))
-
-(define (branch-last-sequence-number _) 0)
-
 (define (room-display-name id)
   (rpc 'room-display-name id))
-
-(define (mark-last-message-as-read id)
-  (rpc 'mark-last-message-as-read id))
-
-(define (find-room rexp)
-  (rpc 'find-room rexp))
 
 ;; Helper procedures
 ;; =================
@@ -143,19 +129,19 @@
     (wcolor_set statuswin 1 #f) ;; regular foreground
     (waddstr* statuswin (sprintf "~a" (string-join notifs-names " ")))))
 
-(define (room-offset room-id)
+#;(define (room-offset room-id)
   (alist-ref room-id *rooms-offset* equal? (branch-last-sequence-number room-id)))
 
-(define (room-offset-set! room-id offset)
+#;(define (room-offset-set! room-id offset)
   (set! *rooms-offset*
     (alist-update! room-id offset *rooms-offset* equal?)))
 
-(define (room-offset-delete! room-id)
+#;(define (room-offset-delete! room-id)
   (set! *rooms-offset*
     (alist-delete! room-id *rooms-offset* equal?)))
 
 (define (refresh-messageswin)
-  (let ((timeline (room-timeline (current-room)))
+  (let ((timeline (rpc 'fetch-events (current-room) rows))
         (read-marker #f #;(read-marker-ref (current-room))))
     (werase messageswin)
     (for-each
@@ -176,7 +162,6 @@
   (if room-id
       (begin
         (current-room room-id)
-        (advance-timeline)
         (refresh-statuswin)
         (refresh-messageswin)
         )
@@ -201,7 +186,7 @@
   (wrefresh messageswin)
   (unless (rpc 'connect)
     (error "could not connect"))
-  (current-room (rpc 'any-room))
+  (current-room (rpc 'find-room "test"))
   (wprintw messageswin "Starting main loop…~%")
   (wrefresh messageswin)
   (defer 'input get-input)
@@ -261,7 +246,7 @@
   (if (eof-object? exp)
       (handle-backend-disconnection worker)
       (case type
-        ((message) (advance-timeline))
+        ((message) (refresh-messageswin))
         ((notifications)
          (set! *notifications* (rpc 'fetch-notifications))
          (refresh-statuswin))
@@ -278,13 +263,6 @@
 
 (define (handle-backend-disconnection worker)
   (exit))
-
-(define (advance-timeline)
-  (put! (current-room)
-        'timeline
-        (append (rpc 'fetch-events (current-room))
-                (room-timeline (current-room))))
-  (refresh-messageswin))
 
 
 ) ;; tui module

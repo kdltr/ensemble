@@ -149,7 +149,7 @@
 (define-key #\newline
   (cond ((or (string=? "" input-string)
              (string-every char-set:white-space input-string))
-         (mark-last-message-as-read (current-room)))
+         (rpc 'mark-last-message-as-read (current-room)))
         ((char=? (string-ref input-string 0) #\/)
          (handle-command input-string))
         (else
@@ -270,7 +270,7 @@
         ((char=? #\! (string-ref (car args) 0))
          (switch-room (string->symbol (car args))))
         (else
-          (switch-room (find-room (string-join args))))))
+          (switch-room (rpc 'find-room (string-join args))))))
 
 (define-command me args
   (worker-send worker 'message:emote (current-room) (string-join args " ")))

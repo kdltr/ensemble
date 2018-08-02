@@ -141,12 +141,8 @@
 
 (safe-environment-set!
   rpc-env 'fetch-events
-  (lambda (room-id)
-    (let* ((ptr (get room-id 'frontend-pointer))
-           (tl (room-timeline room-id))
-           (_ after (if ptr (split-timeline tl ptr) (values '() tl))))
-      (put! room-id 'frontend-pointer (car tl))
-      after)))
+  (lambda (room-id limit)
+    (room-timeline room-id limit: limit)))
 
 (safe-environment-set!
   rpc-env 'any-room any-room)
