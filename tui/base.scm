@@ -15,6 +15,10 @@
 
 ;; TODO Separate info log and errors in two different ports
 ;; FIXME Input get scrambled when typing fast / pasting text
+;; TODO “markup” for events
+;; TODO persistent room numbering (irssi-like)
+;; TODO special “log” room for backend informations / errors
+;; TODO history navigation
 
 (include "tui/input.scm")
 
@@ -207,6 +211,7 @@
   (refresh-statuswin)
   (defer 'input get-input)
   (defer 'idle (lambda () (worker-receive worker)))
+  (worker-send worker 'idle)
   (main-loop))
 
 (define (main-loop)
@@ -256,7 +261,6 @@
 (define (handle-defered who datum)
   (info "Running defered: ~s ~s" who datum)
   (case who
-    ;; FIXME input freezes at some point
     ((input) (handle-input datum))
     ((resize) (resize-terminal))
     (else  (info "Unknown defered procedure: ~a ~s~%" who datum))))
