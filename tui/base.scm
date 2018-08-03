@@ -19,6 +19,7 @@
 ;; TODO persistent room numbering (irssi-like)
 ;; TODO special “log” room for backend informations / errors
 ;; TODO history navigation
+;; TODO names tab-completion
 
 (include "tui/input.scm")
 

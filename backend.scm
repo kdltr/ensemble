@@ -3,7 +3,8 @@
 (include "nonblocking-ports.scm")
 (include "concurrency.scm")
 
-;; TODO current state storage
+;; TODO Better error reporting and recovery
+;; TODO Empty profile
 
 (module backend (run)
 (import
@@ -21,7 +22,7 @@
 (use utf8 utf8-srfi-13 vector-lib uri-common openssl
      intarweb (except medea read-json) cjson
      rest-bind (prefix http-client http:)
-     sandbox srfi-71)
+     sandbox srfi-71 ports)
 
 (define +ensemble-version+ "dev")
 
@@ -41,7 +42,6 @@
     (make-ssl-server-connector
       (ssl-make-client-context* verify?: (not (member "--no-ssl-verify"
                                                       (command-line-arguments))))))
-  (load-profile)
   (defer 'rpc read)
   (main-loop))
 
@@ -54,10 +54,15 @@
         (http:default-server-connector uri proxy))))
 
 (define (load-profile)
-  (let ((uri (config-ref 'server-uri)))
-    (when uri (init! uri))
-    (access-token (config-ref 'access-token))
-    (mxid (config-ref 'mxid))))
+  (let* ((creds (handle-exceptions exn '() (read-file "credentials")))
+         (c:server-uri (alist-ref 'server-uri creds))
+         (c:access-token (alist-ref 'access-token creds))
+         (c:mxid (alist-ref 'mxid creds)))
+    (unless (and c:server-uri c:access-token c:mxid)
+      (error "Please log in"))
+    (init! c:server-uri)
+    (access-token c:access-token)
+    (mxid c:mxid)))
 
 (define (main-loop)
   (let* ((th (receive-defered))
@@ -77,7 +82,7 @@
   (info "received: ~s" exp)
   (set! *frontend-idling* #f)
   (if (eof-object? exp)
-      (exit)
+      (save-and-exit)
       (let (((values first . rest) (handle-exceptions exn
                                      (values +error-marker+ exn)
                                      (safe-eval exp environment: rpc-env))))
@@ -88,6 +93,10 @@
             (info "replied: ~s" response)
             (write response)
             (newline))))))
+
+(define (save-and-exit)
+  (when *next-batch* (save-state))
+  (exit))
 
 (define (exception->string exn)
   (with-output-to-string
@@ -156,8 +165,10 @@
 (safe-environment-set!
   rpc-env 'connect
   (lambda ()
-    (let ((next-batch (sync since: (config-ref 'next-batch))))
-      (defer 'sync sync timeout: 30000 since: (handle-sync next-batch))
+    (load-profile)
+    (load-state)
+    (let ((batch (sync since: *next-batch*)))
+      (defer 'sync sync timeout: 30000 since: (handle-sync batch))
       #t)))
 
 (safe-environment-set!

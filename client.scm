@@ -33,18 +33,6 @@
 ;; DB replacement
 ;; ==============
 
-(define (get-config)
-  (if (file-exists? "config")
-      (read-file "config")
-      '()))
-
-(define (config-ref key)
-  (alist-ref key (get-config)))
-
-(define (config-set! key val)
-  (with-output-to-file (make-pathname (config-home) "config")
-    (lambda () (write (alist-update! key val (get-config))))))
-
 (define (room-exists? id)
   (pair? (symbol-plist id)))
 
@@ -67,6 +55,7 @@
         tl)))
 
 (define *rooms* '())
+(define *next-batch* #f)
 
 (define (any-room)
   (and (pair? *rooms*) (car *rooms*)))
@@ -74,13 +63,28 @@
 (define (joined-rooms)
   *rooms*)
 
-(define (save-db)
-  (with-output-to-file "/tmp/db"
+(define (save-state)
+  (with-output-to-file "state"
     (lambda ()
       (for-each
-        (lambda (r) (write `(room ',r ',(symbol-plist r)))
+        (lambda (r) (write `(room ,r ,(symbol-plist r)))
                     (newline))
-        *rooms*))))
+        *rooms*)
+      (write `(next-batch ,*next-batch*)))))
+
+(define (load-state)
+  (define (load exp)
+    (case (car exp)
+      ((room)
+       (set! (symbol-plist (cadr exp))
+         (caddr exp))
+       (push! (cadr exp) *rooms*))
+      ((next-batch) (set! *next-batch* (cadr exp)))))
+
+  (when (file-exists? "state")
+    (with-input-from-file "state"
+      (lambda ()
+        (port-for-each load read)))))
 
 
 
@@ -286,7 +290,7 @@
   (let ((next (mref '(next_batch) batch)))
     (info "[~A] update: ~a~%" (seconds->string) next)
     (for-each advance-room (mref '(rooms join) batch))
-    #;(config-set! 'next-batch next)
+    (set! *next-batch* next)
     next))
 
 (define (advance-room id+data)
