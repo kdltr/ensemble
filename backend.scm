@@ -3,6 +3,8 @@
 (include "nonblocking-ports.scm")
 (include "concurrency.scm")
 
+;; TODO current state storage
+
 (module backend (run)
 (import
   (except scheme
@@ -161,7 +163,16 @@
 (safe-environment-set!
   rpc-env 'fetch-events
   (lambda (room-id limit)
-    (room-timeline room-id limit: limit)))
+    (let* ((tl (room-timeline room-id limit: limit))
+           (holes (filter hole-event? tl)))
+      (for-each
+        (lambda (hole)
+          ;; TODO hide this state manipulation in request-hole-messages
+          (unless (member hole *requested-holes*)
+            (push! hole *requested-holes*)
+            (defer 'hole-messages request-hole-messages room-id hole limit)))
+        holes)
+      tl)))
 
 (safe-environment-set!
   rpc-env 'any-room any-room)
@@ -210,4 +221,5 @@
       (and marker (symbol->string marker)))))
 
 (run)
+
 ) ;; backend module

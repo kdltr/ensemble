@@ -337,6 +337,10 @@
                (state . ,state))
       (formated . "… some history missing …"))))
 
+(define (hole-event? evt)
+  (equal? (mref '(type) evt)
+            "com.upyum.ensemble.hole"))
+
 (define (fill-hole room-id hole-evt msgs)
   (info "[fill-hole] ~a ~a~%" room-id hole-evt)
   (let* ((timeline (room-timeline room-id))
@@ -351,7 +355,8 @@
     ;; TODO add new hole with msgs.end if chunk is not empty
     (put! room-id 'timeline (append after-hole new-timeline))
     )
-  (set! *requested-holes* (delete! hole-evt *requested-holes*)))
+  (set! *requested-holes* (delete! hole-evt *requested-holes*))
+  (notify-frontend 'message))
 
 (define (filter-out-known-events evts ref-evt)
   (take-while (lambda (o) (not (equal? ref-evt o))) evts))
