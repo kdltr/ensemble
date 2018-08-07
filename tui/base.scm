@@ -18,7 +18,6 @@
 ;; TODO persistent room numbering (irssi-like)
 ;; TODO special “log” room for backend informations / errors
 ;; TODO history navigation
-;; TODO names tab-completion
 ;; TODO support for multiple profiles/backends
 
 (include "tui/input.scm")

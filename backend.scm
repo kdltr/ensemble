@@ -231,6 +231,17 @@
     (let ((marker (read-marker-ref id)))
       (and marker (symbol->string marker)))))
 
-(run)
+(safe-environment-set!
+  rpc-env 'room-members
+  (lambda (id)
+    (let* ((ctx (room-context id))
+           (members (room-members ctx)))
+      (map
+        (lambda (m)
+          (or (json-true? (mref '(displayname) m))
+              (caar m)))
+        members))))
+
+(cond-expand (csi (void)) (else (run)))
 
 ) ;; backend module

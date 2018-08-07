@@ -120,21 +120,15 @@
 (define-key (KEY_END #\x05) ;; C-e
   (move-cursor 'right))
 
-#;(define-key #\tab
+(define-key #\tab
   (unless (equal? input-string "")
-    (let* ((members (remove (lambda (o)
-                              (equal? (string-downcase (mxid))
-                                      (string-downcase (caar o))))
-                            (room-members (room-context (current-room)))))
-           (members-names (map (lambda (o)
-                                 (or (json-true? (mref '(displayname) o)) (caar o)))
-                            members))
+    (let* ((members-names (rpc 'room-members (current-room)))
            (prefix (substring input-string 0 cursor-pos))
-           (candidate (find (cut string-prefix? prefix <>) members-names)))
+           (candidate (find (cut string-prefix-ci? prefix <>) members-names)))
       (when candidate
         (when (string-suffix? " (IRC)" candidate) ;; Ugh, kill me now
           (set! candidate (substring candidate 0 (- (string-length candidate) 6))))
-        (set! input-string (string-append candidate ", "))
+        (set! input-string (string-append candidate ": "))
         (move-cursor 'right))
       )))
 
