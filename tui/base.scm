@@ -11,10 +11,9 @@
   posix data-structures irregex srfi-18 miscmacros extras
   concurrency debug locations)
 (use srfi-1 ioctl ncurses utf8 utf8-srfi-13 utf8-srfi-14 unicode-char-sets files
-     srfi-71)
+     srfi-71 gochan)
 
 ;; TODO Separate info log and errors in two different ports
-;; FIXME Input get scrambled when typing fast / pasting text
 ;; TODO “markup” for events
 ;; TODO persistent room numbering (irssi-like)
 ;; TODO special “log” room for backend informations / errors
@@ -32,27 +31,65 @@
 (define messageswin)
 
 (define worker)
-(define *stored-defered* '())
+(define *user-channel* (gochan 0))
+(define *worker-channel* (gochan 0))
+(define *idling* #f)
+
+(define (idle)
+  (info "STARTING IDLE")
+  (set! *idling* #t)
+  (worker-send worker 'idle))
+
+(define (stop-idle)
+  (define (collect resps)
+    (let ((exp (gochan-recv *worker-channel*)))
+      (if (eqv? exp 'stopped)
+          (begin
+            (set! *idling* #f)
+            (for-each handle-idle-response resps))
+          (collect (cons exp resps)))))
+
+  (when *idling*
+    (info "STOP IDLE")
+    (worker-send worker 'stop)
+    (collect '())))
+
+(define (with-idle-stopped thunk)
+  (let ((was-idling *idling*))
+    (stop-idle)
+    (receive vals (thunk)
+      (when was-idling (idle))
+      (apply values vals))))
+
+
+(define (worker-read-loop wrk)
+  (let ((exp (worker-receive wrk)))
+    (gochan-send *worker-channel* exp)
+    (unless (eof-object? exp) (worker-read-loop wrk))))
+
+(define (user-read-loop)
+  (gochan-send *user-channel* (get-input))
+  (user-read-loop))
+
 
 (define (rpc . args)
-  (info "Sending RPC: ~s" args)
-  (apply worker-send worker args)
-  (let lp ((res (worker-receive worker)))
-    (info "RECEIVING ~s" res)
-    (cond ((eof-object? res)
-           (error "backend stopped"))
-          ((eqv? res 'stopped)
-           (lp (worker-receive worker)))
-          ((not (pair? res))
-           (error "Strange RPC response" res))
-          ((eqv? (car res) 'error)
-           (error "Error from backend" (cadr res)))
-          ((eqv? (car res) 'values)
-            (info "Got response from RPC: ~s" res)
-            (apply values (cdr res)))
-          (else
-            (error "Strange RPC response" res))
-    )))
+  (with-idle-stopped
+    (lambda ()
+      (info "Sending RPC: ~s" args)
+      (apply worker-send worker args)
+      (let ((res (gochan-recv *worker-channel*)))
+        (info "RECEIVING ~s" res)
+        (cond ((eof-object? res)
+               (handle-backend-disconnection worker))
+              ((not (pair? res))
+               (error "Strange RPC response" res))
+              ((eqv? (car res) 'error)
+               (error "Error from backend" (cadr res)))
+              ((eqv? (car res) 'values)
+               (info "Got response from RPC: ~s" res)
+               (apply values (cdr res)))
+              (else
+                (error "Strange RPC response" res)))))))
 
 (define current-room (make-parameter #f))
 
@@ -151,7 +188,10 @@
 
 (define (run)
   (set! (signal-handler signal/winch)
-    (lambda (_) (defer 'resize (lambda () #t))))
+    (lambda (_)
+      (thread-start!
+        (lambda ()
+          (gochan-send *user-channel* 'resize)))))
   (set! (signal-handler signal/int)
     (lambda (_) (reset)))
   (current-error-port (open-output-file "frontend.log"))
@@ -166,6 +206,8 @@
           (create-directory profile-dir #t)
           (change-directory profile-dir)
           (process-execute (make-pathname src-dir "backend"))))))
+  (thread-start! user-read-loop)
+  (thread-start! (lambda () (worker-read-loop worker)))
   (wprintw messageswin "Connecting…~%")
   (wrefresh messageswin)
   (unless (rpc 'connect)
@@ -175,33 +217,23 @@
   (wrefresh messageswin)
   (refresh-messageswin)
   (refresh-statuswin)
-  (defer 'input get-input)
-  (defer 'idle (lambda () (worker-receive worker)))
-  (worker-send worker 'idle)
+  (idle)
   (main-loop))
 
 (define (main-loop)
-  (info "MAIN LOOP")
   (wnoutrefresh messageswin)
   (wnoutrefresh statuswin)
   (wnoutrefresh inputwin)
   (doupdate)
-  (let* ((th (receive-defered))
-         (who datum (thread-join-protected! th)))
-    (info "DEFERED: ~s ~s" who datum)
-    (case who
-      ((idle)
-       (handle-idle-response datum)
-       (worker-send worker 'idle)
-       (defer 'idle (lambda () (worker-receive worker))))
-      ((input)
-       (worker-send worker 'stop)
-       (push! (list who datum) *stored-defered*)
-       (defer 'input get-input))
-      (else
-        (worker-send worker 'stop)
-        (push! (list who datum) *stored-defered*))
-      ))
+  (gochan-select
+    ((*worker-channel* -> msg fail)
+     (set! *idling* #f)
+     (handle-idle-response msg)
+     (idle))
+    ((*user-channel* -> msg fail)
+     (if (eqv? msg 'resize)
+         (resize-terminal)
+         (handle-input msg))))
   (main-loop))
 
 (define (get-input)
@@ -243,16 +275,11 @@
         ((highlights)
          (set! *highlights* (rpc 'fetch-highlights))
          (refresh-statuswin))
-        ((stopped)
-         (for-each
-           (lambda (args) (apply handle-defered args))
-           *stored-defered*)
-         (set! *stored-defered* '()))
         (else (info "unknown idle response: ~a" type))
         )))
 
 (define (handle-backend-disconnection worker)
-  (exit))
+  (error "Backend disconnected"))
 
 
 ) ;; tui module
