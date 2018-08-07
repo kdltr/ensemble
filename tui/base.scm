@@ -13,7 +13,6 @@
 (use srfi-1 ioctl ncurses utf8 utf8-srfi-13 utf8-srfi-14 unicode-char-sets files
      srfi-71 gochan)
 
-;; TODO Separate info log and errors in two different ports
 ;; TODO “markup” for events
 ;; TODO persistent room numbering (irssi-like)
 ;; TODO special “log” room for backend informations / errors
@@ -193,7 +192,7 @@
           (gochan-send *user-channel* 'resize)))))
   (set! (signal-handler signal/int)
     (lambda (_) (reset)))
-  (current-error-port (open-output-file "frontend.log"))
+  (info-port (open-output-file "frontend.log"))
   (start-interface)
   (wprintw messageswin "Starting backend…~%")
   (wrefresh messageswin)

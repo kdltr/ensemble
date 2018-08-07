@@ -35,6 +35,7 @@
 
 (define (run)
   (current-error-port (open-output-file "backend.log"))
+  (info-port (current-error-port))
   (current-input-port (open-input-file*/nonblocking 0))
   (current-output-port (open-output-file*/nonblocking 1))
   ;; Enable server certificate validation for https URIs.
