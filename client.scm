@@ -170,7 +170,10 @@
 ;; TODO fix this mess up
 ;; TODO membership may be ban, leave… in the context
 (define (m.room.member-printer evt ctx)
-  (let* ((who (state-key evt))
+  (let* ((sender (mref '(sender) evt))
+         (sender-name (or (member-displayname sender ctx)
+                          sender))
+         (who (state-key evt))
          (membership (string->symbol (mref '(content membership) evt)))
          (maybe-name (json-true? (mref '(content displayname) evt)))
          (maybe-avatar (json-true? (mref '(content avatar_url) evt)))
@@ -179,11 +182,11 @@
                              who)))
     (case membership
       ((invite)
-       (sprintf "*** ~A was invited to the room" displayed-name))
+       (sprintf "*** ~A invited ~A to the room" sender-name displayed-name))
       ((leave)
        (sprintf "*** ~A left the room" displayed-name))
       ((ban)
-       (sprintf "*** ~A was banned from the room" displayed-name))
+       (sprintf "*** ~A banned ~A from the room" sender-name displayed-name))
       ((knock)
        (sprintf "*** ~A knocked" displayed-name))
       ((join)
