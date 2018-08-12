@@ -5,6 +5,8 @@
 
 ;; TODO Better error reporting and recovery
 ;; TODO Empty profile
+;; TODO Environment variables for config and cache/state directories
+;; TODO Show the result of message sending and read marker immediately
 
 (module backend (run)
 (import

@@ -33,6 +33,7 @@
 (define *worker-channel* (gochan 0))
 (define *idling* #f)
 
+;; FIXME still not right
 (define (idle)
   (info "STARTING IDLE")
   (set! *idling* #t)
