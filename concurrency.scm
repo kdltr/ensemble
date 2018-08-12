@@ -3,8 +3,17 @@
                      start-worker worker-wait
                      worker-receive worker-send
                      worker-name)
-(import scheme chicken debug srfi-18 nonblocking-ports srfi-71)
-(use gochan posix)
+(import scheme
+        (chicken base)
+        (chicken condition)
+        (chicken file posix)
+        (chicken process)
+        srfi-18
+        srfi-71
+        gochan
+        debug
+        nonblocking-ports)
+
 
 ;; Defering API
 ;; ============

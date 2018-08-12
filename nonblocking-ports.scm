@@ -2,8 +2,14 @@
 
 (module nonblocking-ports (open-input-file*/nonblocking
                            open-output-file*/nonblocking)
-(import scheme chicken foreign ports)
-(use posix srfi-18 srfi-71)
+(import scheme
+        (chicken bitwise)
+        (chicken condition)
+        (chicken errno)
+        (chicken file posix)
+        (chicken port)
+        srfi-18
+        srfi-71)
 
 (define ((fd-read-char fd))
   (thread-wait-for-i/o! fd #:input)

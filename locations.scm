@@ -1,6 +1,8 @@
 (module locations (config-home cache-home)
-(import scheme chicken)
-(use files)
+(import scheme
+        (chicken base)
+        (chicken pathname)
+        (chicken process-context))
 
 (define (xdg-config-home)
   (cond ((get-environment-variable "XDG_CONFIG_HOME")
