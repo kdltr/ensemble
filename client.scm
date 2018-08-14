@@ -235,10 +235,14 @@
     (sprintf "[~a] ~a~%" time
              (if str
                  (if (or (eq? (void) str) (equal? "" str))
-                     (sprintf "### BUG in printer for ~a~%EVT: ~s~%CTX: ~s" type evt ctx)
+                     "" ;; FIXME
+                     #;(sprintf "### BUG in printer for ~a~%EVT: ~s~%CTX: ~s" type evt ctx)
                      str)
                  (sprintf "No event printer for ~a: ~s" type content)))))
 
+(define (cleanup-event evt)
+  `((event_id . ,(alist-ref 'event_id evt))
+    (formated . ,(alist-ref 'formated evt))))
 
 
 ;; Room management
@@ -279,12 +283,15 @@
   (vector-for-each (lambda (i evt)
                      (when (equal? (mref '(type) evt) "m.receipt")
                        (let ((datum (mref '(content) evt)))
-                         (for-each (lambda (id+reads)
-                                     (when (member (string-downcase (mxid))
-                                                   (map (o string-downcase symbol->string car)
-                                                     (mref '(m.read) (cdr id+reads))))
-                                       (info "[marker] id+reads: ~s~%" id+reads)
-                                       (read-marker-set! room-id (car id+reads))))
+                         (for-each
+                           (lambda (id+reads)
+                             (when (member (string-downcase (mxid))
+                                           (map (o string-downcase symbol->string car)
+                                             (mref '(m.read) (cdr id+reads))))
+                               (info "[marker] id+reads: ~s~%" id+reads)
+                               (read-marker-set! room-id (car id+reads))
+                               (when (get room-id 'frontend-subscribed)
+                                 (ipc-send 'read-marker room-id (car id+reads)))))
                            datum)
                          )))
                    ephemerals))
@@ -306,29 +313,34 @@
          (state* (mref '(state events) room-data))
          (state (if (vector? state*) state* #()))
          (notifs (mref '(unread_notifications notification_count) room-data))
-         (highlights (mref '(unread_notifications highlight_count) room-data)))
+         (highlights (mref '(unread_notifications highlight_count) room-data))
+         (old-timeline (or (room-timeline room-id) '())))
     (unless (room-exists? room-id)
       (initialize-room! room-id state))
-    (receive (new-timeline new-state)
+    (receive (timeline-additions new-state)
       ((compose ;; Timeline events
                 (advance-timeline events)
                 ;; Timeline Hole
                 (if limited
                     (punch-hole prev-batch state)
                     values))
-       (room-timeline room-id) (room-context room-id))
-      (put! room-id 'timeline new-timeline)
-      (put! room-id 'bottom-state new-state))
+       '() (room-context room-id))
+      (put! room-id 'timeline
+            (append timeline-additions old-timeline))
+      (put! room-id 'bottom-state new-state)
+      (when (get room-id 'frontend-subscribed)
+        (for-each
+          (lambda (m)
+            (ipc-send 'message room-id (cleanup-event m)))
+          (reverse timeline-additions))))
 
     (manage-ephemerals room-id ephemerals)
     (when highlights
       (put! room-id 'highlights highlights)
-      (notify-frontend 'highlights))
+      (ipc-send 'highights room-id highlights))
     (when notifs
       (put! room-id 'notifications notifs)
-      (notify-frontend 'notifications))
-    (notify-frontend 'message)))
-
+      (ipc-send 'notifications room-id notifs))))
 
 
 ;; Holes management
@@ -363,7 +375,7 @@
     (put! room-id 'timeline (append after-hole new-timeline))
     )
   (set! *requested-holes* (delete! hole-evt *requested-holes*))
-  (notify-frontend 'message))
+  (ipc-send 'refresh room-id))
 
 (define (filter-out-known-events evts ref-evt)
   (take-while (lambda (o) (not (equal? ref-evt o))) evts))
