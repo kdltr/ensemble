@@ -6,7 +6,7 @@
 (cond-expand
       (debug (define (info fmt . args)
                (fprintf (info-port) "~?~%" fmt args)
-               (flush-output (current-error-port))))
+               (flush-output (info-port))))
       (else (define-syntax info
               (syntax-rules ()
                 ((info . rest) (void))))))

@@ -77,10 +77,11 @@
                  (open-output-file*/nonblocking out2)
                  pid)))
 
-(define (worker-send w . msg)
+(define (worker-send w msg)
   (let ((out (worker-output w)))
-    (write `(,(car msg) ,@(map (lambda (o) (list 'quote o)) (cdr msg))) out)
-    (newline out)))
+    (write msg out)
+    (newline out)
+    (flush-output out)))
 
 (define (worker-receive w)
   (values (read (worker-input w)) w))

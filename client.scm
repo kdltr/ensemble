@@ -337,7 +337,7 @@
     (manage-ephemerals room-id ephemerals)
     (when highlights
       (put! room-id 'highlights highlights)
-      (ipc-send 'highights room-id highlights))
+      (ipc-send 'highlights room-id highlights))
     (when notifs
       (put! room-id 'notifications notifs)
       (ipc-send 'notifications room-id notifs))))

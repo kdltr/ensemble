@@ -122,7 +122,7 @@
 
 (define-key #\tab
   (unless (equal? input-string "")
-    (let* ((members-names (rpc 'room-members (current-room)))
+    (let* ((members-names (ipc-query 'room-members (current-room)))
            (prefix (substring input-string 0 cursor-pos))
            (candidate (find (cut string-prefix-ci? prefix <>) members-names)))
       (when candidate
@@ -143,11 +143,11 @@
 (define-key #\newline
   (cond ((or (string=? "" input-string)
              (string-every char-set:white-space input-string))
-         (rpc 'mark-last-message-as-read (current-room)))
+         (ipc-send 'mark-last-message-as-read (current-room)))
         ((char=? (string-ref input-string 0) #\/)
          (handle-command input-string))
         (else
-          (worker-send worker 'message:text (current-room) input-string)))
+          (ipc-send 'message:text (current-room) input-string)))
   (set! input-string "")
   (move-cursor 'left))
 
@@ -264,10 +264,10 @@
         ((char=? #\! (string-ref (car args) 0))
          (switch-room (string->symbol (car args))))
         (else
-          (switch-room (rpc 'find-room (string-join args))))))
+          (switch-room (ipc-query 'find-room (string-join args))))))
 
 (define-command me args
-  (worker-send worker 'message:emote (current-room) (string-join args " ")))
+  (ipc-send 'message:emote (current-room) (string-join args " ")))
 
 (define-command (exit quit) args
   (exit))

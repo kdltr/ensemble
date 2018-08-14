@@ -31,35 +31,6 @@
 (define worker)
 (define *user-channel* (gochan 0))
 (define *worker-channel* (gochan 0))
-(define *idling* #f)
-
-;; FIXME still not right
-(define (idle)
-  (info "STARTING IDLE")
-  (set! *idling* #t)
-  (worker-send worker 'idle))
-
-(define (stop-idle)
-  (define (collect resps)
-    (let ((exp (gochan-recv *worker-channel*)))
-      (if (eqv? exp 'stopped)
-          (begin
-            (set! *idling* #f)
-            (for-each handle-idle-response resps))
-          (collect (cons exp resps)))))
-
-  (when *idling*
-    (info "STOP IDLE")
-    (worker-send worker 'stop)
-    (collect '())))
-
-(define (with-idle-stopped thunk)
-  (let ((was-idling *idling*))
-    (stop-idle)
-    (receive vals (thunk)
-      (when was-idling (idle))
-      (apply values vals))))
-
 
 (define (worker-read-loop wrk)
   (let ((exp (worker-receive wrk)))
@@ -70,25 +41,28 @@
   (gochan-send *user-channel* (get-input))
   (user-read-loop))
 
+(define (ipc-send . args)
+  (info "Sending IPC: ~s" args)
+  (worker-send worker args))
 
-(define (rpc . args)
-  (with-idle-stopped
-    (lambda ()
-      (info "Sending RPC: ~s" args)
-      (apply worker-send worker args)
-      (let ((res (gochan-recv *worker-channel*)))
-        (info "RECEIVING ~s" res)
-        (cond ((eof-object? res)
-               (handle-backend-disconnection worker))
-              ((not (pair? res))
-               (error "Strange RPC response" res))
-              ((eqv? (car res) 'error)
-               (error "Error from backend" (cadr res)))
-              ((eqv? (car res) 'values)
-               (info "Got response from RPC: ~s" res)
-               (apply values (cdr res)))
-              (else
-                (error "Strange RPC response" res)))))))
+
+(define *query-number* 0)
+(define *queries* '())
+
+(define (ipc-query . args)
+  (apply ipc-send 'query (inc! *query-number*) args)
+  (call/cc
+    (lambda (k)
+      (push! (cons *query-number* k)
+             *queries*)
+      (main-loop))))
+
+(define (handle-query-response id datum)
+  (info "Queries waiting: ~a" (length *queries*))
+  (and-let* ((pair (assoc id *queries*))
+             (task (cdr pair)))
+       (set! *queries* (delete! pair *queries*))
+       (task datum)))
 
 (define current-room (make-parameter #f))
 
@@ -102,7 +76,7 @@
 ;; ==============
 
 (define (room-display-name id)
-  (rpc 'room-display-name id))
+  (ipc-query 'room-display-name id))
 
 
 ;; TUI
@@ -139,9 +113,10 @@
 (define (refresh-statuswin)
   (let* ((regular-notifs (lset-difference eqv? *notifications* *highlights*))
          (highlights-names (map room-display-name *highlights*))
-         (notifs-names (map room-display-name regular-notifs)))
+         (notifs-names (map room-display-name regular-notifs))
+         (room-name (room-display-name (current-room))))
     (werase statuswin)
-    (waddstr* statuswin (sprintf "Room: ~a | " (room-display-name (current-room))))
+    (waddstr* statuswin (sprintf "Room: ~a | " room-name))
     (wcolor_set statuswin 2 #f) ;; highlight foreground
     (waddstr* statuswin (sprintf "~a" (string-join highlights-names " " 'suffix)))
     (wcolor_set statuswin 1 #f) ;; regular foreground
@@ -159,17 +134,8 @@
     (alist-delete! room-id *rooms-offset* equal?)))
 
 (define (refresh-messageswin)
-  (let ((timeline (rpc 'fetch-events (current-room) rows))
-        (read-marker (rpc 'read-marker (current-room))))
-    (werase messageswin)
-    (for-each
-      (lambda (evt)
-        (maybe-newline)
-        (wprintw messageswin "~A" (alist-ref 'formated evt))
-        (when (and read-marker (equal? read-marker (alist-ref 'event_id evt)))
-          (maybe-newline)
-          (wprintw messageswin "~A" (make-string cols #\-))))
-      (reverse timeline))))
+  (werase messageswin)
+  (ipc-send 'fetch-events (current-room) rows))
 
 (define (maybe-newline)
   (let ((l c (getyx messageswin)))
@@ -178,7 +144,9 @@
 (define (switch-room room-id)
   (if room-id
       (begin
+        (ipc-send 'unsubscribe (current-room))
         (current-room room-id)
+        (ipc-send 'subscribe (current-room))
         (refresh-statuswin)
         (refresh-messageswin)
         )
@@ -209,14 +177,11 @@
   (thread-start! (lambda () (worker-read-loop worker)))
   (wprintw messageswin "Connecting…~%")
   (wrefresh messageswin)
-  (unless (rpc 'connect)
-    (error "could not connect"))
-  (current-room (rpc 'any-room))
-  (wprintw messageswin "Starting main loop…~%")
-  (wrefresh messageswin)
+  (ipc-send 'connect)
+  (current-room (ipc-query 'any-room))
+  (ipc-send 'subscribe (current-room))
   (refresh-messageswin)
   (refresh-statuswin)
-  (idle)
   (main-loop))
 
 (define (main-loop)
@@ -226,9 +191,7 @@
   (doupdate)
   (gochan-select
     ((*worker-channel* -> msg fail)
-     (set! *idling* #f)
-     (handle-idle-response msg)
-     (idle))
+     (handle-backend-response msg))
     ((*user-channel* -> msg fail)
      (if (eqv? msg 'resize)
          (resize-terminal)
@@ -255,26 +218,25 @@
     (refresh-statuswin)
     (refresh-inputwin)))
 
-(define (handle-defered who datum)
-  (info "Running defered: ~s ~s" who datum)
-  (case who
-    ((input) (handle-input datum))
-    ((resize) (resize-terminal))
-    (else  (info "Unknown defered procedure: ~a ~s~%" who datum))))
-
-(define (handle-idle-response type)
-  (info "Got an idle notification: ~s" type)
-  (if (eof-object? exp)
+(define (handle-backend-response msg)
+  (info "Recvd from backend: ~s" msg)
+  (if (eof-object? msg)
       (handle-backend-disconnection worker)
-      (case type
-        ((message) (refresh-messageswin))
-        ((notifications)
-         (set! *notifications* (rpc 'fetch-notifications))
-         (refresh-statuswin))
+      (case (car msg)
         ((highlights)
-         (set! *highlights* (rpc 'fetch-highlights))
+         (set! *highlights* (ipc-query 'fetch-highlights))
          (refresh-statuswin))
-        (else (info "unknown idle response: ~a" type))
+        ((notifications)
+         (set! *notifications* (ipc-query 'fetch-notifications))
+         (refresh-statuswin))
+        ((response)
+         (apply handle-query-response (cdr msg)))
+        ((message)
+         (when (equal? (cadr msg) (current-room))
+           (maybe-newline)
+           (wprintw messageswin "~A"
+                    (alist-ref 'formated (caddr msg)))))
+        (else (info "Unknown message from backend: ~a" msg))
         )))
 
 (define (handle-backend-disconnection worker)
