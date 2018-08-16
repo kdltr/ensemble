@@ -17,6 +17,7 @@
 ;; TODO persistent room numbering (irssi-like)
 ;; TODO special “log” room for backend informations / errors
 ;; TODO history navigation
+;; TODO read marker
 ;; TODO support for multiple profiles/backends
 
 (include "tui/input.scm")
@@ -122,19 +123,20 @@
     (wcolor_set statuswin 1 #f) ;; regular foreground
     (waddstr* statuswin (sprintf "~a" (string-join notifs-names " ")))))
 
-#;(define (room-offset room-id)
-  (alist-ref room-id *rooms-offset* equal? (branch-last-sequence-number room-id)))
+(define (room-offset room-id)
+  (alist-ref room-id *rooms-offset* equal? 0))
 
-#;(define (room-offset-set! room-id offset)
+(define (room-offset-set! room-id offset)
   (set! *rooms-offset*
     (alist-update! room-id offset *rooms-offset* equal?)))
 
-#;(define (room-offset-delete! room-id)
+(define (room-offset-delete! room-id)
   (set! *rooms-offset*
     (alist-delete! room-id *rooms-offset* equal?)))
 
 (define (refresh-messageswin)
-  (ipc-send 'fetch-events (current-room) rows))
+  (ipc-send 'fetch-events (current-room) rows
+            (room-offset (current-room))))
 
 (define (maybe-newline)
   (let ((l c (getyx messageswin)))

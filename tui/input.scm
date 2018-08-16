@@ -218,23 +218,23 @@
          (switch-room (last *highlights*)))))
 
 ;; History down
-#;(define-key KEY_NPAGE
+(define-key KEY_NPAGE
   (let* ((current-offset (room-offset (current-room)))
-         (next (events-next (current-room) current-offset 1)))
-    (unless (null? next)
-      (let ((new-offset (last next)))
-        (if (= new-offset (branch-last-sequence-number (current-room)))
-            (room-offset-delete! (current-room))
-            (room-offset-set! (current-room) new-offset))
-        (refresh-messageswin)))))
+         (new-offset (sub1 current-offset)))
+    (if (= new-offset 0)
+        (begin
+          (room-offset-delete! (current-room))
+          (ipc-send 'subscribe (current-room)))
+        (room-offset-set! (current-room) (max 0 new-offset)))
+    (refresh-messageswin)))
 
 ;; History up
-#;(define-key KEY_PPAGE
+(define-key KEY_PPAGE
   (let* ((current-offset (room-offset (current-room)))
-         (prev (events-previous (current-room) current-offset 1)))
-    (unless (null? prev)
-      (room-offset-set! (current-room) (last prev))
-      (refresh-messageswin))))
+         (new-offset (add1 current-offset)))
+    (room-offset-set! (current-room) new-offset)
+    (ipc-send 'unsubscribe (current-room))
+    (refresh-messageswin)))
 
 
 ;; Commands

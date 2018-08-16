@@ -160,8 +160,8 @@
 
 (safe-environment-set!
   rpc-env 'fetch-events
-  (lambda (room-id limit)
-    (let* ((tl (room-timeline room-id limit: limit))
+  (lambda (room-id limit offset)
+    (let* ((tl (room-timeline room-id limit: limit offset: offset))
            (holes (filter hole-event? tl)))
       (for-each
         (lambda (hole)

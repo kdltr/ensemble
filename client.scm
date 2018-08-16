@@ -9,8 +9,9 @@
       (room-mark-read room-id evt-id))))
 
 (define (room-display-name id)
-  (let ((ctx (room-context id)))
-    (or (room-name ctx)
+  (let ((ctx (and id (room-context id))))
+    (or (and (not ctx) "")
+        (room-name ctx)
         (json-true? (mref '(("" . m.room.canonical_alias) alias) ctx))
         (and-let* ((v (json-true? (mref '(("" . m.room.aliases) aliases) ctx))))
              (vector-ref v 0))
@@ -48,11 +49,12 @@
 (define (read-marker-set! room-id event-id)
   (put! room-id 'read-marker event-id))
 
-(define (room-timeline room-id #!key (limit #f) (offset #f))
-  (let ((tl (get room-id 'timeline)))
-    (if (and limit (<= limit (length tl)))
-        (take tl limit)
-        tl)))
+(define (room-timeline room-id #!key (limit #f) (offset 0))
+  (let* ((tl (or (get room-id 'timeline) '()))
+         (offseted-tl (if (<= offset (length tl)) (drop tl offset) '())))
+    (if (and limit (<= limit (length offseted-tl)))
+        (take offseted-tl limit)
+        offseted-tl)))
 
 (define *rooms* '())
 (define *next-batch* #f)
@@ -272,6 +274,7 @@
                 new-state)))))
 
 (define ((punch-hole prev-batch state-events) timeline state)
+  (info "Punching hole: ~s" prev-batch)
   (values (cons (make-hole-event prev-batch state)
                 timeline)
           (vector-fold (lambda (i ctx evt)
@@ -323,7 +326,7 @@
          (state (if (vector? state*) state* #()))
          (notifs (mref '(unread_notifications notification_count) room-data))
          (highlights (mref '(unread_notifications highlight_count) room-data))
-         (old-timeline (or (room-timeline room-id) '())))
+         (old-timeline (room-timeline room-id)))
     (unless (room-exists? room-id)
       (initialize-room! room-id state))
     (receive (timeline-additions new-state)
@@ -377,9 +380,15 @@
                   (reverse (vector->list (mref '(chunk) msgs)))
                   (if (pair? before-hole) (car before-hole) '())))
          (new-timeline new-state
-          ((advance-timeline (list->vector events)) before-hole hole-state)))
+          ((compose ;; Timeline events
+                    (advance-timeline (list->vector events))
+                    ;; Timeline Hole
+                    values
+                    (if (pair? events)
+                        (punch-hole (mref '(end) msgs) #;"FIXME state events" #())
+                        values))
+           before-hole hole-state)))
     ;; FIXME the state handling is wrong (have to rewind with prev_content)
-    ;; TODO add new hole with msgs.end if chunk is not empty
     (put! room-id 'timeline (append after-hole new-timeline))
     )
   (set! *requested-holes* (delete! hole-evt *requested-holes*))
