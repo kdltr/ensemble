@@ -5,7 +5,7 @@
   (string->json (read-string #f port)))
 
 (cond-expand
-      (debug (use describe trace)
+      (debug #;(use describe trace)
              #;(trace read-json json->string))
       (else))
 
@@ -57,9 +57,9 @@
                                             uri: uri-rewritten
                                             headers: headers-rewritten)))
     (cond-expand
-          (debug (fprintf (current-error-port) "SENDING REQUEST:\n")
-                 (describe request-rewritten (current-error-port))
-                 (newline (current-error-port)))
+          (debug #;(fprintf (current-error-port) "SENDING REQUEST:\n")
+                 #;(describe request-rewritten (current-error-port))
+                 #;(newline (current-error-port)))
           (else))
     (http:call-with-input-request request-rewritten writer reader)))
 
