@@ -170,10 +170,12 @@
             (push! hole *requested-holes*)
             (defer 'hole-messages request-hole-messages room-id hole limit)))
         holes)
+      (ipc-send 'bundle-start)
       (for-each
         (lambda (m)
           (ipc-send 'message room-id (cleanup-event m)))
-        (reverse tl)))))
+        (reverse tl))
+      (ipc-send 'bundle-end))))
 
 (safe-environment-set!
   rpc-env 'message:text

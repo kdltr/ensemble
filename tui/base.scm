@@ -185,6 +185,7 @@
   (main-loop))
 
 (define (main-loop)
+  (info "INTERFACE REFRESH")
   (wnoutrefresh messageswin)
   (wnoutrefresh statuswin)
   (wnoutrefresh inputwin)
@@ -223,6 +224,10 @@
   (if (eof-object? msg)
       (handle-backend-disconnection worker)
       (case (car msg)
+        ((bundle-start)
+         (for-each
+           handle-backend-response
+           (collect-bundle-messages)))
         ((notifications)
          (set! *highlights* (cadr msg))
          (set! *notifications* (caddr msg))
@@ -240,5 +245,10 @@
 (define (handle-backend-disconnection worker)
   (error "Backend disconnected"))
 
+(define (collect-bundle-messages)
+  (let ((msg (gochan-recv *worker-channel*)))
+    (if (equal? msg '(bundle-end))
+        '()
+        (cons msg (collect-bundle-messages)))))
 
 ) ;; tui module
