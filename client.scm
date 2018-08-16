@@ -243,8 +243,7 @@
                  (sprintf "No event printer for ~a: ~s" type content)))))
 
 (define (cleanup-event evt)
-  `((event_id . ,(alist-ref 'event_id evt))
-    (formated . ,(alist-ref 'formated evt))))
+  (alist-delete 'content evt))
 
 
 ;; Room management
@@ -267,8 +266,16 @@
         (let* ((evt (vector-ref events i))
                (new-state (update-context state evt))
                (evt-id (mref '(event_id) evt))
+               (formated (print-event evt state))
+               (my-name (or (member-displayname (mxid) state)
+                            (mxid)))
+               (highlight? (and (not (equal? (mref '(sender) evt)
+                                             (mxid)))
+                                (irregex-search (list 'w/nocase my-name)
+                                                formated)))
                (fmt-evt `((event_id . ,evt-id)
-                          (formated . ,(print-event evt state)))))
+                          (formated . ,formated)
+                          ,@(if highlight? '((highlight . #t)) '()))))
           (loop (add1 i)
                 (cons fmt-evt timeline)
                 new-state)))))

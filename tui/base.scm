@@ -102,6 +102,7 @@
   (set! statuswin (newwin 1 cols (- rows 2) 0))
   (init_pair 1 COLOR_BLACK COLOR_WHITE)
   (init_pair 2 COLOR_RED COLOR_WHITE)
+  (init_pair 3 COLOR_RED COLOR_BLACK)
   (wbkgdset statuswin (COLOR_PAIR 1))
   (wprintw messageswin "Loading…~%")
   (wrefresh messageswin)
@@ -242,8 +243,11 @@
         ((message)
          (when (equal? (cadr msg) (current-room))
            (maybe-newline)
+           (when (alist-ref 'highlight (caddr msg))
+             (wcolor_set messageswin 3 #f))
            (wprintw messageswin "~A"
-                    (alist-ref 'formated (caddr msg)))))
+                    (alist-ref 'formated (caddr msg)))
+           (wcolor_set messageswin 0 #f)))
         (else (info "Unknown message from backend: ~a" msg))
         )))
 
