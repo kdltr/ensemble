@@ -151,7 +151,9 @@
 (safe-environment-set!
   rpc-env 'subscribe
   (lambda (room-id)
-    (put! room-id 'frontend-subscribed #t)))
+    (put! room-id 'frontend-subscribed #t)
+    (and-let* ((mark (get room-id 'read-marker)))
+      (ipc-send 'read-marker room-id mark))))
 
 (safe-environment-set!
   rpc-env 'unsubscribe

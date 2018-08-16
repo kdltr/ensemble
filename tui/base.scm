@@ -69,6 +69,7 @@
 
 (define *notifications* '())
 (define *highlights* '())
+(define *read-marker* #f)
 
 (define *rooms-offset* '())
 
@@ -240,6 +241,10 @@
            (refresh-messageswin)))
         ((response)
          (apply handle-query-response (cdr msg)))
+        ((read-marker)
+         (when (equal? (cadr msg) (current-room))
+           (set! *read-marker* (symbol->string (caddr msg)))
+           (refresh-messageswin)))
         ((message)
          (when (equal? (cadr msg) (current-room))
            (maybe-newline)
@@ -247,7 +252,11 @@
              (wcolor_set messageswin 3 #f))
            (wprintw messageswin "~A"
                     (alist-ref 'formated (caddr msg)))
-           (wcolor_set messageswin 0 #f)))
+           (wcolor_set messageswin 0 #f)
+           (when (equal? (alist-ref 'event_id (caddr msg))
+                         *read-marker*)
+             (wprintw messageswin "~A" (make-string cols #\-)))
+           ))
         (else (info "Unknown message from backend: ~a" msg))
         )))
 
