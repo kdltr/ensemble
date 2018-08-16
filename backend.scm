@@ -202,8 +202,6 @@
           (proc (case what
                   ((find-room) find-room)
                   ((any-room) any-room)
-                  ((fetch-notifications) fetch-notifications)
-                  ((fetch-highlights) fetch-highlights)
                   ((room-members) query-room-members)
                   ((room-display-name) room-display-name)
                   ((read-marker) read-marker)
