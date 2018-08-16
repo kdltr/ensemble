@@ -237,18 +237,6 @@
                           (searched-string (room-context room-id))))
         (joined-rooms)))
 
-(define (fetch-notifications)
-  (filter (lambda (r)
-            (let ((n (get r 'notifications)))
-              (and n (not (zero? n)))))
-          *rooms*))
-
-(define (fetch-highlights)
-  (filter (lambda (r)
-            (let ((n (get r 'highlights)))
-              (and n (not (zero? n)))))
-          *rooms*))
-
 (define (query-room-members id)
   (let* ((ctx (room-context id))
          (members (room-members ctx)))

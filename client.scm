@@ -296,10 +296,19 @@
                          )))
                    ephemerals))
 
+(define (fetch-properties prop)
+  (filter (lambda (r)
+            (let ((n (get r prop)))
+              (and n (not (zero? n)))))
+          *rooms*))
+
 (define (handle-sync batch)
   (let ((next (mref '(next_batch) batch)))
     (info "[~A] update: ~a~%" (seconds->string) next)
     (for-each advance-room (mref '(rooms join) batch))
+    (ipc-send 'notifications
+              (fetch-properties 'highlights)
+              (fetch-properties 'notifications))
     (set! *next-batch* next)
     next))
 
@@ -336,11 +345,10 @@
 
     (manage-ephemerals room-id ephemerals)
     (when highlights
-      (put! room-id 'highlights highlights)
-      (ipc-send 'highlights room-id highlights))
+      (put! room-id 'highlights highlights))
     (when notifs
-      (put! room-id 'notifications notifs)
-      (ipc-send 'notifications room-id notifs))))
+      (put! room-id 'notifications notifs))))
+
 
 
 ;; Holes management
