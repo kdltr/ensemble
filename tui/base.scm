@@ -134,7 +134,6 @@
     (alist-delete! room-id *rooms-offset* equal?)))
 
 (define (refresh-messageswin)
-  (werase messageswin)
   (ipc-send 'fetch-events (current-room) rows))
 
 (define (maybe-newline)
@@ -144,7 +143,8 @@
 (define (switch-room room-id)
   (if room-id
       (begin
-        (ipc-send 'unsubscribe (current-room))
+        (when (current-room)
+          (ipc-send 'unsubscribe (current-room)))
         (current-room room-id)
         (ipc-send 'subscribe (current-room))
         (refresh-statuswin)
@@ -178,10 +178,7 @@
   (wprintw messageswin "Connecting…~%")
   (wrefresh messageswin)
   (ipc-send 'connect)
-  (current-room (ipc-query 'any-room))
-  (ipc-send 'subscribe (current-room))
-  (refresh-messageswin)
-  (refresh-statuswin)
+  (switch-room (ipc-query 'any-room))
   (main-loop))
 
 (define (main-loop)
@@ -232,6 +229,9 @@
          (set! *highlights* (cadr msg))
          (set! *notifications* (caddr msg))
          (refresh-statuswin))
+        ((clear)
+         (when (equal? (cadr msg) (current-room))
+           (werase messageswin)))
         ((response)
          (apply handle-query-response (cdr msg)))
         ((message)

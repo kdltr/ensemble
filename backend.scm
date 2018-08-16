@@ -171,6 +171,7 @@
             (defer 'hole-messages request-hole-messages room-id hole limit)))
         holes)
       (ipc-send 'bundle-start)
+      (ipc-send 'clear room-id)
       (for-each
         (lambda (m)
           (ipc-send 'message room-id (cleanup-event m)))
