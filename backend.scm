@@ -27,6 +27,8 @@
      rest-bind (prefix http-client http:)
      sandbox srfi-71 ports)
 
+(define *lock-file*)
+
 (define +ensemble-version+ "dev")
 
 (define rpc-env (make-safe-environment name: 'rpc-environment
@@ -37,6 +39,13 @@
 (include "client.scm")
 
 (define (run)
+  (set! *lock-file* (file-open "lock"
+                              (bitwise-ior open/rdwr open/creat)
+                              (bitwise-ior perm/irusr perm/iwusr)
+                              ))
+  (handle-exceptions exn
+    (error "This profile is already in use")
+    (file-lock (open-output-file* *lock-file*)))
   (current-error-port (open-output-file "backend.log"))
   (info-port (current-error-port))
   (current-input-port (open-input-file*/nonblocking 0))
