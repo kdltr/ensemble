@@ -5,7 +5,14 @@
 (include "tui/base.scm")
 
 (module main ()
-(import foreign tui ncurses chicken scheme)
+(import
+  scheme
+  (chicken base)
+  (chicken condition)
+  (chicken foreign)
+  (chicken format)
+  ncurses
+  tui)
 
 (foreign-declare "#include <locale.h>")
 (foreign-code "setlocale(LC_ALL, \"C.UTF-8\");")

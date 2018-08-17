@@ -1,5 +1,7 @@
 (module debug (info-port info)
-(import scheme chicken extras)
+(import scheme
+        (chicken base)
+        (chicken format))
 
 (define info-port (make-parameter (current-error-port)))
 

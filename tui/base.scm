@@ -1,17 +1,30 @@
 (module tui (run)
 (import
-  (except scheme
-          string-length string-ref string-set! make-string string substring
-          string->list list->string string-fill! write-char read-char display)
-  (except chicken
-          reverse-list->string print print*)
-  (except data-structures
-          ->string conc string-chop string-split string-translate
-          substring=? substring-ci=? substring-index substring-index-ci)
-  posix data-structures irregex srfi-18 miscmacros extras
-  concurrency debug locations)
-(use srfi-1 ioctl ncurses utf8 utf8-srfi-13 utf8-srfi-14 unicode-char-sets files
-     srfi-71 gochan)
+  scheme
+  (chicken base)
+  (chicken condition)
+  (chicken file)
+  (chicken format)
+  (chicken irregex)
+  (chicken pathname)
+  (chicken process-context)
+  (chicken process)
+  (chicken process signal)
+  (chicken repl)
+  srfi-1
+  srfi-18
+  srfi-71
+  gochan
+  utf8
+  utf8-srfi-13
+  utf8-srfi-14
+  unicode-char-sets
+  ioctl
+  ncurses
+  miscmacros
+  concurrency
+  debug
+  locations)
 
 ;; TODO “markup” for events
 ;; TODO persistent room numbering (irssi-like)
@@ -86,7 +99,7 @@
 
 (define (start-interface)
   ;; Make ncurses wait less time when receiving an ESC character
-  (setenv "ESCDELAY" "20")
+  (set-environment-variable! "ESCDELAY" "20")
 
   (initscr)
   (noecho)

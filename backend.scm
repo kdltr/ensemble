@@ -11,21 +11,37 @@
 
 (module backend (run)
 (import
-  (except scheme
-          string-length string-ref string-set! make-string string substring
-          string->list list->string string-fill! write-char read-char display)
-  (except chicken
-          reverse-list->string print print*)
-  (except data-structures
-          ->string conc string-chop string-split string-translate
-          substring=? substring-ci=? substring-index substring-index-ci)
-  ports files posix srfi-1 extras miscmacros irregex
-  concurrency debug locations nonblocking-ports)
-
-(use utf8 utf8-srfi-13 vector-lib uri-common openssl
-     intarweb (except medea read-json) cjson
-     rest-bind (prefix http-client http:)
-     sandbox srfi-71 ports)
+  scheme
+  (chicken base)
+  (chicken condition)
+  (chicken file)
+  (chicken format)
+  (chicken io)
+  (chicken irregex)
+  (chicken plist)
+  (chicken port)
+  (chicken process-context)
+  (chicken time)
+  (chicken time posix)
+  miscmacros
+  srfi-1
+  srfi-71
+  utf8
+  utf8-srfi-13
+  utf8-srfi-14
+  vector-lib
+  uri-common
+  openssl
+  intarweb
+  (except medea read-json)
+  cjson
+  rest-bind
+  (prefix http-client #:http)
+  sandbox
+  concurrency
+  debug
+  locations
+  nonblocking-ports)
 
 (define *lock-file*)
 
@@ -65,6 +81,9 @@
                      (uri-port remote-end)
                      ctx)
         (http:default-server-connector uri proxy))))
+
+(define (read-file file-name)
+  (with-input-from-file file-name read-list))
 
 (define (load-profile)
   (let* ((creds (handle-exceptions exn '() (read-file "credentials")))

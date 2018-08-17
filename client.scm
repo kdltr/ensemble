@@ -231,7 +231,8 @@
          (timestamp (mref '(origin_server_ts) evt))
          (time (if timestamp
                    (time->string
-                     (seconds->local-time (/ timestamp 1000))
+                     (seconds->local-time
+                       (inexact->exact (round (/ timestamp 1000))))
                      "%d/%m %H:%M")
                    "unknown")))
     (sprintf "[~a] ~a~%" time
