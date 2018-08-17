@@ -7,6 +7,7 @@
 ;; TODO Empty profile
 ;; TODO Environment variables for config and cache/state directories
 ;; TODO Show the result of message sending and read marker immediately
+;; TODO profile locking to avoid multiple instances using the same profiles
 
 (module backend (run)
 (import
