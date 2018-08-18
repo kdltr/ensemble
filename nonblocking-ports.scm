@@ -3,6 +3,7 @@
 (module nonblocking-ports (open-input-file*/nonblocking
                            open-output-file*/nonblocking)
 (import scheme
+        (chicken base)
         (chicken bitwise)
         (chicken condition)
         (chicken errno)

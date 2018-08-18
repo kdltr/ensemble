@@ -13,8 +13,10 @@
 (import
   scheme
   (chicken base)
+  (chicken bitwise)
   (chicken condition)
   (chicken file)
+  (chicken file posix)
   (chicken format)
   (chicken io)
   (chicken irregex)
