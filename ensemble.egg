@@ -18,7 +18,7 @@
    srfi-71
    ncurses
    miscmacros)
- #;(platform (not windows)) TODO add back for CHICKEN 5.0.0
+ #;(platform (not windows)) ; TODO add back for CHICKEN 5.0.0
  (component-options (csc-options -D debug))
  (components
    ;; Helper libraries
