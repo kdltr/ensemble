@@ -2,6 +2,14 @@
 
 set -e
 
+extract_dependencies() {
+    csi -e "(for-each print (alist-ref 'dependencies (with-input-from-file \"ensemble.egg\" read)))" | grep -Ev '(ncurses|rest-bind|openssl)'
+}
+
+build_normal_deps() {
+    extract_dependencies | xargs chicken-install
+}
+
 build_custom_dep() {
     echo "Building $1…"
     cd "$1";
@@ -30,6 +38,9 @@ test -d .git && git submodule update --init
 ( build_custom_dep rest-bind )
 ( build_custom_dep openssl )
 
+build_normal_deps
+
+# Build Ensemble itself (without installing)
 chicken-install -n
 
 echo "Ensemble has been bulit, yay! \o/"
