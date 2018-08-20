@@ -4,3 +4,6 @@
 [submodule "rest-bind"]
 	path = rest-bind
 	url = git://upyum.com/forks/rest-bind
+[submodule "openssl"]
+	path = openssl
+	url = git://upyum.com/forks/openssl

@@ -28,6 +28,7 @@ test -d .git && git submodule update --init
 
 ( build_custom_dep chicken-ncurses )
 ( build_custom_dep rest-bind )
+( build_custom_dep openssl )
 
 chicken-install -n
 
