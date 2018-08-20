@@ -3,7 +3,7 @@
 set -e
 
 extract_dependencies() {
-    csi -e "(for-each print (alist-ref 'dependencies (with-input-from-file \"ensemble.egg\" read)))" | grep -Ev '(ncurses|rest-bind|openssl)'
+    csi -e "(for-each print (alist-ref 'dependencies (with-input-from-file \"ensemble.egg\" read)))" | grep -Ev '(ncurses|rest-bind|openssl|bind|utf8)'
 }
 
 build_normal_deps() {
@@ -28,7 +28,11 @@ build_sudo_deps() {
 cd "`dirname $0`"
 
 # Little hack for extensions that install stuff outside of the repository
-test -w "`chicken-install -repository`" || build_sudo_deps
+if test -w "`chicken-install -repository`"; then
+    chicken-install bind utf8
+else
+    build_sudo_deps
+fi
 
 . ./vars.sh
 
@@ -43,5 +47,5 @@ build_normal_deps
 # Build Ensemble itself (without installing)
 chicken-install -n
 
-echo "Ensemble has been bulit, yay! \o/"
+echo "Ensemble has been built, yay! \o/"
 echo 'Run it with `./run.sh`'
