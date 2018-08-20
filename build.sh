@@ -20,7 +20,7 @@ build_sudo_deps() {
 cd "`dirname $0`"
 
 # Little hack for extensions that install stuff outside of the repository
-test -w "`chicken-install -repository`" || build_sudo_dep
+test -w "`chicken-install -repository`" || build_sudo_deps
 
 . ./vars.sh
 
