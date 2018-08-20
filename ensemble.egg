@@ -19,7 +19,7 @@
    ncurses
    miscmacros)
  #;(platform (not windows)) ; TODO add back for CHICKEN 5.0.0
- (component-options (csc-options -D debug))
+ (component-options (csc-options "-D" "debug"))
  (components
    ;; Helper libraries
    (extension ensemble.libs.debug
