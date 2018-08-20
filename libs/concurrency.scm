@@ -1,18 +1,19 @@
-(module concurrency (defer receive-defered retry
-                     thread-join-protected!
-                     start-worker worker-wait
-                     worker-receive worker-send
-                     worker-name)
-(import scheme
-        (chicken base)
-        (chicken condition)
-        (chicken file posix)
-        (chicken process)
-        srfi-18
-        srfi-71
-        gochan
-        debug
-        nonblocking-ports)
+(module (ensemble libs concurrency) (defer receive-defered retry
+                                     thread-join-protected!
+                                     start-worker worker-wait
+                                     worker-receive worker-send
+                                     worker-name)
+(import
+  scheme
+  (chicken base)
+  (chicken condition)
+  (chicken file posix)
+  (chicken process)
+  srfi-18
+  srfi-71
+  gochan
+  (ensemble libs debug)
+  (ensemble libs nonblocking-ports))
 
 
 ;; Defering API

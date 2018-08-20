@@ -1,4 +1,4 @@
-(module tui (run)
+(module (ensemble interface console) (run)
 (import
   scheme
   (chicken base)
@@ -22,9 +22,9 @@
   ioctl
   ncurses
   miscmacros
-  concurrency
-  debug
-  locations)
+  (ensemble libs concurrency)
+  (ensemble libs debug)
+  (ensemble libs locations))
 
 ;; TODO “markup” for events
 ;; TODO persistent room numbering (irssi-like)
@@ -33,7 +33,7 @@
 ;; TODO read marker
 ;; TODO support for multiple profiles/backends
 
-(include "tui/input.scm")
+(include-relative "input.scm")
 
 (define tty-fileno 0)
 (define rows)
@@ -189,7 +189,7 @@
               (src-dir (current-directory)))
           (create-directory profile-dir #t)
           (change-directory profile-dir)
-          (process-execute (make-pathname src-dir "backend"))))))
+          (process-execute (make-pathname src-dir "ensemble.backend.matrix"))))))
   (thread-start! user-read-loop)
   (thread-start! (lambda () (worker-read-loop worker)))
   (wprintw messageswin "Connecting…~%")

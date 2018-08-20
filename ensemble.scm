@@ -1,9 +1,3 @@
-(include "debug.scm")
-(include "locations.scm")
-(include "nonblocking-ports.scm")
-(include "concurrency.scm")
-(include "tui/base.scm")
-
 (module main ()
 (import
   scheme
@@ -12,7 +6,7 @@
   (chicken foreign)
   (chicken format)
   ncurses
-  tui)
+  (ensemble interface console))
 
 (foreign-declare "#include <locale.h>")
 (foreign-code "setlocale(LC_ALL, \"C.UTF-8\");")

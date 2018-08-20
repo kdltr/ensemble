@@ -1,6 +1,5 @@
 credentials
 state
-*.so
-ensemble
-backend
+lock
 *.log
+repo

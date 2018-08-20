@@ -1,4 +1,4 @@
-(include "low-level.scm")
+(include-relative "low-level.scm")
 
 ;; Helper procedures
 ;; =================

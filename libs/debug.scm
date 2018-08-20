@@ -1,4 +1,5 @@
-(module debug (info-port info)
+(module (ensemble libs debug)
+  (info-port info)
 (import scheme
         (chicken base)
         (chicken format))

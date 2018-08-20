@@ -1,15 +1,10 @@
-(include "debug.scm")
-(include "locations.scm")
-(include "nonblocking-ports.scm")
-(include "concurrency.scm")
-
 ;; TODO Better error reporting and recovery
 ;; TODO Empty profile
 ;; TODO Environment variables for config and cache/state directories
 ;; TODO Show the result of message sending and read marker immediately
 ;; TODO profile locking to avoid multiple instances using the same profiles
 
-(module backend (run)
+(module (ensemble backend matrix) (run)
 (import
   scheme
   (chicken base)
@@ -40,10 +35,10 @@
   rest-bind
   (prefix http-client #:http)
   sandbox
-  concurrency
-  debug
-  locations
-  nonblocking-ports)
+  (ensemble libs concurrency)
+  (ensemble libs debug)
+  (ensemble libs locations)
+  (ensemble libs nonblocking-ports))
 
 (define *lock-file*)
 
@@ -53,8 +48,8 @@
                                        mutable: #f
                                        extendable: #f))
 
-(include "matrix.scm")
-(include "client.scm")
+(include-relative "matrix.scm")
+(include-relative "client.scm")
 
 (define (run)
   (set! *lock-file* (file-open "lock"

@@ -1,16 +1,18 @@
 (declare (disable-interrupts))
 
-(module nonblocking-ports (open-input-file*/nonblocking
-                           open-output-file*/nonblocking)
-(import scheme
-        (chicken base)
-        (chicken bitwise)
-        (chicken condition)
-        (chicken errno)
-        (chicken file posix)
-        (chicken port)
-        srfi-18
-        srfi-71)
+(module (ensemble libs nonblocking-ports)  (open-input-file*/nonblocking
+                                            open-output-file*/nonblocking)
+(import
+  scheme
+  (chicken base)
+  (chicken bitwise)
+  (chicken condition)
+  (chicken errno)
+  (chicken file posix)
+  (chicken port)
+  srfi-18
+  srfi-71)
+
 
 (define BUFSIZE 1024)
 

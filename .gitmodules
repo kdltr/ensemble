@@ -1,3 +1,6 @@
 [submodule "chicken-ncurses"]
 	path = chicken-ncurses
 	url = git://upyum.com/forks/chicken-ncurses
+[submodule "rest-bind"]
+	path = rest-bind
+	url = git://upyum.com/forks/rest-bind

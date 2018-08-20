@@ -1,0 +1,57 @@
+((synopsis "Client for the Matrix.org protocol")
+ (author "Adrien (Kooda) Ramos")
+ (category net)
+ (dependencies
+   utf8
+   http-client
+   rest-bind
+   openssl
+   intarweb
+   gochan
+   uri-common
+   medea
+   cjson
+   vector-lib
+   ioctl
+   sandbox
+   srfi-71
+   ncurses
+   miscmacros)
+ (platform (not windows))
+ (component-options (csc-options -D debug))
+ (components
+   ;; Helper libraries
+   (extension ensemble.libs.debug
+              (source "libs/debug.scm"))
+   (extension ensemble.libs.locations
+              (source "libs/locations.scm"))
+   (extension ensemble.libs.nonblocking-ports
+              (source "libs/nonblocking-ports.scm"))
+   (extension ensemble.libs.concurrency
+              (source "libs/concurrency.scm")
+              (component-dependencies
+                ensemble.libs.debug
+                ensemble.libs.nonblocking-ports))
+   ;; Matrix backend
+   (program ensemble.backend.matrix
+            (source "backend/matrix/main.scm")
+            (component-dependencies
+              ensemble.libs.debug
+              ensemble.libs.locations
+              ensemble.libs.nonblocking-ports
+              ensemble.libs.concurrency)
+            (source-dependencies
+              "backend/matrix/low-level.scm"
+              "backend/matrix/matrix.scm"
+              "backend/matrix/client.scm"))
+   (extension ensemble.interface.console
+              (source "interface/console/base.scm")
+              (component-dependencies
+                ensemble.libs.debug
+                ensemble.libs.locations
+                ensemble.libs.concurrency))
+   ;; Console interface
+   (program ensemble
+            (component-dependencies
+              ensemble.interface.console))
+   ))
