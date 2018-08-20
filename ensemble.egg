@@ -14,6 +14,7 @@
    vector-lib
    ioctl
    sandbox
+   srfi-18
    srfi-71
    ncurses
    miscmacros)
@@ -44,13 +45,13 @@
               "backend/matrix/low-level.scm"
               "backend/matrix/matrix.scm"
               "backend/matrix/client.scm"))
+   ;; Console interface
    (extension ensemble.interface.console
               (source "interface/console/base.scm")
               (component-dependencies
                 ensemble.libs.debug
                 ensemble.libs.locations
                 ensemble.libs.concurrency))
-   ;; Console interface
    (program ensemble
             (component-dependencies
               ensemble.interface.console))
