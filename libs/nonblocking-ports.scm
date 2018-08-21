@@ -53,6 +53,7 @@
 ;; ============
 
 (define (open-output-file*/nonblocking fd)
+  (define old-flags (file-control fd fcntl/getfl))
   (define buf (make-string BUFSIZE #\null))
   (define pos 0)
 
@@ -76,11 +77,13 @@
               (flush-buf)
               (write-buf str)))))
 
-  (file-control fd fcntl/setfl (bitwise-ior (file-control fd fcntl/getfl)
-                                            open/nonblock))
-  (make-output-port fd-write-string
-                    (lambda () (file-close fd))
-                    flush-buf))
+  (define (fd-close)
+    (flush-buf)
+    (file-control fd fcntl/setfl old-flags)
+    (file-close fd))
+
+  (file-control fd fcntl/setfl (bitwise-ior old-flags open/nonblock))
+  (make-output-port fd-write-string fd-close flush-buf))
 
 (define (with-nonblocking-write fd thunk)
   (condition-case
@@ -89,7 +92,7 @@
          (if (or (= (errno) errno/again)
                  (= (errno) errno/wouldblock))
              (begin
-               (thread-wait-for-i/o! fd)
+               (thread-wait-for-i/o! fd #:output)
                (with-nonblocking-write fd thunk))))))
 
 (define (copy-string! target tpos source)
