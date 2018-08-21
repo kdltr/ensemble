@@ -311,19 +311,10 @@
                          )))
                    ephemerals))
 
-(define (fetch-properties prop)
-  (filter (lambda (r)
-            (let ((n (get r prop)))
-              (and n (not (zero? n)))))
-          *rooms*))
-
 (define (handle-sync batch)
   (let ((next (mref '(next_batch) batch)))
     (info "[~A] update: ~a~%" (seconds->string) next)
     (for-each advance-room (mref '(rooms join) batch))
-    (ipc-send 'notifications
-              (fetch-properties 'highlights)
-              (fetch-properties 'notifications))
     (set! *next-batch* next)
     next))
 
@@ -362,7 +353,13 @@
     (when highlights
       (put! room-id 'highlights highlights))
     (when notifs
-      (put! room-id 'notifications notifs))))
+      (put! room-id 'notifications notifs))
+    (send-notifications room-id)))
+
+(define (send-notifications room-id)
+  (ipc-send 'notifications room-id
+            (inexact->exact (round (or (get room-id 'highlights) 0)))
+            (inexact->exact (round (or (get room-id 'notifications) 0)))))
 
 
 

@@ -188,6 +188,7 @@
     (load-profile)
     (load-state)
     (ipc-info "Connecting…")
+    (for-each send-notifications (joined-rooms))
     (defer 'sync sync since: *next-batch*)))
 
 (safe-environment-set!

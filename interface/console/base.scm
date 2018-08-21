@@ -135,6 +135,14 @@
         (else
           (room-display-name (window-room win)))))
 
+(define (window-notifications win)
+  (cond ((special-window? win)
+         (values 0 0))
+        (else
+          (let ((room-id (window-room win)))
+            (values (or (get room-id 'highlights) 0)
+                    (or (get room-id 'notifications) 0))))))
+
 (define (add-room-window room-id #!optional
                          (id (string->symbol (->string *free-window-number*))))
   (unless (any (lambda (win) (eqv? (get win 'room-id) room-id)) *room-windows*)
@@ -189,8 +197,6 @@
           (refresh-room-window *current-window*))))
 
 (define (refresh-room-window id)
-  (maybe-newline)
-  (wprintw messageswin "Loading…~%")
   (let ((room-id (window-room id)))
     (ipc-send 'fetch-events room-id rows
             (room-offset room-id))))
@@ -248,10 +254,25 @@
     (waddstr* statuswin (sprintf "Room: ~a | " room-name))
     (for-each
       (lambda (win)
-        (waddstr* statuswin
-                  (if (eqv? win *current-window*)
-                      (sprintf "[~a] " win)
-                      (sprintf "~a " win))))
+        (let* ((hls notifs (window-notifications win))
+               (fmt (if (and (zero? hls) (zero? notifs))
+                        "~a"
+                        "~a(~a:~a)"))
+               (args (if (and (zero? hls) (zero? notifs))
+                         (list win)
+                         (list win
+                               (if (zero? hls) "" hls)
+                               (if (zero? notifs) "" notifs)))))
+          (cond ((> hls 0) (wcolor_set statuswin 2 #f))
+                ((> notifs 0) (wcolor_set statuswin 1 #f))
+                (else (wattron statuswin A_DIM)))
+          (waddstr* statuswin
+                    (if (eqv? win *current-window*)
+                        (sprintf "[~?] " fmt args)
+                        (sprintf "~? " fmt args)))
+          (wcolor_set statuswin 0 #f)
+          (wattroff statuswin A_DIM)
+          ))
       (append *special-windows* *room-windows*))))
 
 (define (room-offset room-id)
@@ -373,9 +394,10 @@
            handle-backend-response
            (collect-bundle-messages)))
         ((notifications)
-         (set! *highlights* (cadr msg))
-         (set! *notifications* (caddr msg))
-         (refresh-statuswin))
+         (let ((room-id (cadr msg)))
+           (put! room-id 'highlights (caddr msg))
+           (put! room-id 'notifications (cadddr msg))
+           (refresh-statuswin)))
         ((clear)
          (when (equal? (cadr msg) (current-room))
            (werase messageswin)))
