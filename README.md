@@ -17,20 +17,17 @@ If you want to support this project, consider donating [on liberapay](https://li
 How to use it
 -------------
 
-If you grabbed the source from git:
-`git submodule init` followed by `git submodule update`
+Run `migrate.sh` to convert the pre 0.5 database to a profile for the new version.
 
-To build from sources (git or source tarball) run:
+If you grabbed the source from git, build with:
 `make`
 
 Run with:
-`./ensemble`
+`./run.sh`
 
-It will prompt you for your server’s URL and credentials.
+You can quit by typing `/exit` or `/quit` at the input prompt.
 
-You can quit by typing /exit or /quit at the input prompt.
-
-All configuration and session storage is kept in the $XDG_CONFIG_HOME/ensemble.dat file (usually ~/.config/ensemble.dat)
+All configuration and session storage is kept $XDG_CONFIG_HOME/ensemble/ (usually ~/.config/ensemble/)
 
 
 Available commands
@@ -60,6 +57,7 @@ Available key bindings
 - `M-n` switches to the first room of the notification stack
 - `C-n` switches to the last room of the notification stack
 - `Tab` to auto-complete nicknames (only works at the beginning of a message)
+
 
 TUI Roadmap and ideas
 ---------------------
