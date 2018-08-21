@@ -67,7 +67,7 @@
 
 (define (save-state)
   (info "State saving started")
-  (with-output-to-file "state"
+  (with-output-to-file *state-file*
     (lambda ()
       (for-each
         (lambda (r)
@@ -87,8 +87,8 @@
        (push! (cadr exp) *rooms*))
       ((next-batch) (set! *next-batch* (cadr exp)))))
 
-  (when (file-exists? "state")
-    (with-input-from-file "state"
+  (when (file-exists? *state-file*)
+    (with-input-from-file *state-file*
       (lambda ()
         (port-for-each load read)))))
 

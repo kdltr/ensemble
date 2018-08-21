@@ -15,6 +15,7 @@
   (chicken format)
   (chicken io)
   (chicken irregex)
+  (chicken pathname)
   (chicken plist)
   (chicken port)
   (chicken process-context)
@@ -40,7 +41,10 @@
   (ensemble libs locations)
   (ensemble libs nonblocking-ports))
 
-(define *lock-file*)
+(define *lock-fd*)
+(define *profile-dir*)
+(define *cache-dir*)
+(define *state-file*)
 
 (define +ensemble-version+ "dev")
 
@@ -52,13 +56,20 @@
 (include-relative "client.scm")
 
 (define (run)
-  (set! *lock-file* (file-open "lock"
+  (when (not (= 1 (length (command-line-arguments))))
+    (error "Usage: backend PROFILE"))
+  (set! *profile-dir* (make-pathname (config-home) (car (command-line-arguments))))
+  (set! *cache-dir* (make-pathname (cache-home) (car (command-line-arguments))))
+  (create-directory *profile-dir* #t)
+  (create-directory *cache-dir* #t)
+  (set! *state-file* (make-pathname *cache-dir* "state"))
+  (set! *lock-fd* (file-open (make-pathname *profile-dir* "lock")
                               (bitwise-ior open/rdwr open/creat)
                               (bitwise-ior perm/irusr perm/iwusr)))
   (handle-exceptions exn
     (error "This profile is already in use")
-    (file-lock (open-output-file* *lock-file*)))
-  (let ((err-port (open-output-file "backend.log"))
+    (file-lock (open-output-file* *lock-fd*)))
+  (let ((err-port (open-output-file (make-pathname *profile-dir* "backend.log")))
         (in-port (open-input-file*/nonblocking 0))
         (out-port (open-output-file*/nonblocking 1)))
     (current-error-port err-port)
@@ -91,7 +102,8 @@
   (with-input-from-file file-name read-list))
 
 (define (load-profile)
-  (let* ((creds (handle-exceptions exn '() (read-file "credentials")))
+  (let* ((creds (handle-exceptions exn '()
+                  (read-file (make-pathname *profile-dir* "credentials"))))
          (c:server-uri (alist-ref 'server-uri creds))
          (c:access-token (alist-ref 'access-token creds))
          (c:mxid (alist-ref 'mxid creds)))
