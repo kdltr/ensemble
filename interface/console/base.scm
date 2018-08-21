@@ -8,6 +8,7 @@
   (chicken irregex)
   (chicken pathname)
   (chicken plist)
+  (chicken port)
   (chicken process-context)
   (chicken process)
   (chicken process signal)
@@ -134,8 +135,11 @@
         (else
           (room-display-name (window-room win)))))
 
-(define (add-room-window room-id)
-  (let ((id (string->symbol (->string (inc! *free-window-number*)))))
+(define (add-room-window room-id #!optional
+                         (id (string->symbol (->string *free-window-number*))))
+  (unless (any (lambda (win) (eqv? (get win 'room-id) room-id)) *room-windows*)
+    (let ((n (string->number (symbol->string id))))
+      (when n (set! *free-window-number* (add1 n))))
     (put! id 'room-id room-id)
     (put! id 'profile 'default) ;; TODO change that when multiple profiles are there
     (set! *room-windows*
@@ -276,9 +280,10 @@
   (set! (signal-handler signal/int)
     (lambda (_) (reset)))
   (cond-expand (debug (info-port (open-output-file "frontend.log"))) (else))
+  (start-interface)
+  (special-window-write 'ensemble "Loading config…")
   (load-config)
   (on-exit save-config)
-  (start-interface)
   (special-window-write 'ensemble "Starting backend…")
   (set! worker
     (start-worker 'default
@@ -296,10 +301,27 @@
   (main-loop))
 
 (define (load-config)
-  (void))
+  (let ((path (make-pathname (config-home) "interface-windows")))
+    (when (file-exists? path)
+      (with-input-from-file path
+        (lambda ()
+          (port-for-each
+            (lambda (exp)
+              (case (car exp)
+                ((window)
+                 (add-room-window (caddr exp) (cadr exp)))
+                (else
+                  (special-window-write 'ensemble "Unknown config expression: ~s"
+                                        exp))))
+             read))))))
 
 (define (save-config)
-  (void))
+  (with-output-to-file (make-pathname (config-home) "interface-windows")
+    (lambda ()
+      (for-each
+        (lambda (win)
+          (write `(window ,win ,(window-room win))))
+        *room-windows*))))
 
 
 (define (process-execute* exec args)
