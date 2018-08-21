@@ -48,6 +48,8 @@
    ;; Console interface
    (extension ensemble.interface.console
               (source "interface/console/base.scm")
+              (source-dependencies
+                "interface/console/input.scm")
               (component-dependencies
                 ensemble.libs.debug
                 ensemble.libs.locations

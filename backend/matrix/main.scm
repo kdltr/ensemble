@@ -55,11 +55,11 @@
 (include-relative "matrix.scm")
 (include-relative "client.scm")
 
-(define (run)
-  (when (not (= 1 (length (command-line-arguments))))
+(define (run . args)
+  (when (not (= 1 (length args)))
     (error "Usage: backend PROFILE"))
-  (set! *profile-dir* (make-pathname (config-home) (car (command-line-arguments))))
-  (set! *cache-dir* (make-pathname (cache-home) (car (command-line-arguments))))
+  (set! *profile-dir* (make-pathname (config-home) (car args)))
+  (set! *cache-dir* (make-pathname (cache-home) (car args)))
   (create-directory *profile-dir* #t)
   (create-directory *cache-dir* #t)
   (set! *state-file* (make-pathname *cache-dir* "state"))
@@ -86,7 +86,7 @@
   (http:server-connector
     (make-ssl-server-connector
       (ssl-make-client-context* verify?: (not (member "--no-ssl-verify"
-                                                      (command-line-arguments))))))
+                                                      args)))))
   (defer 'rpc read)
   (main-loop))
 
@@ -244,11 +244,12 @@
   rpc-env 'query
   (lambda (query-id what . args)
     (let ((pred (case what
-                  ((any-room) (lambda () (pair? (joined-rooms))))
+                  ((any-room joined-rooms) (lambda () (pair? (joined-rooms))))
                   (else yes)))
           (proc (case what
                   ((find-room) find-room)
                   ((any-room) any-room)
+                  ((joined-rooms) joined-rooms)
                   ((room-members) query-room-members)
                   ((room-display-name) room-display-name)
                   ((read-marker) read-marker)
@@ -296,6 +297,6 @@
     (and marker (symbol->string marker))))
 
 
-(cond-expand (csi (void)) (else (run)))
+(cond-expand (csi (void)) (else (apply run (command-line-arguments))))
 
 ) ;; backend module

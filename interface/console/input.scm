@@ -138,16 +138,17 @@
 (define-key #\x0C ;; C-l
   (refresh-statuswin)
   (refresh-inputwin)
-  (refresh-messageswin))
+  (refresh-current-window))
 
 (define-key #\newline
   (cond ((or (string=? "" input-string)
              (string-every char-set:white-space input-string))
-         (ipc-send 'mark-last-message-as-read (current-room)))
+         (when (room-window? *current-window*)
+           (ipc-send 'mark-last-message-as-read (current-room))))
         ((char=? (string-ref input-string 0) #\/)
          (handle-command input-string))
-        (else
-          (ipc-send 'message:text (current-room) input-string)))
+        ((room-window? *current-window*)
+         (ipc-send 'message:text (current-room) input-string)))
   (set! input-string "")
   (move-cursor 'left))
 
@@ -201,7 +202,7 @@
     (unless (= old-pos new-pos)
       (delete-word-right))))
 
-(define-key #(#\escape #\n)
+#;(define-key #(#\escape #\n)
   (let* ((notifs (append *highlights* *notifications*))
          (inside (memv (current-room) notifs)))
     (unless (null? notifs)
@@ -211,11 +212,19 @@
               (switch-room (cadr inside)))
           (switch-room (car notifs))))))
 
+(define (switch-to-adjacent windows)
+  (let ((current-position (memv *current-window* windows)))
+    (assert current-position)
+    (switch-window
+      (if (null? (cdr current-position))
+          (car windows)
+          (cadr current-position)))))
+
 (define-key #\x0e ;; C-n
-  (cond ((not (null? *notifications*))
-         (switch-room (last *notifications*)))
-        ((not (null? *highlights*))
-         (switch-room (last *highlights*)))))
+  (switch-to-adjacent (append *special-windows* *room-windows*)))
+
+(define-key #\x10 ;; C-p
+  (switch-to-adjacent (reverse (append *special-windows* *room-windows*))))
 
 ;; History down
 (define-key KEY_NPAGE
@@ -226,7 +235,7 @@
           (room-offset-delete! (current-room))
           (ipc-send 'subscribe (current-room)))
         (room-offset-set! (current-room) (max 0 new-offset)))
-    (refresh-messageswin)))
+    (refresh-current-window)))
 
 ;; History up
 (define-key KEY_PPAGE
@@ -234,7 +243,7 @@
          (new-offset (add1 current-offset)))
     (room-offset-set! (current-room) new-offset)
     (ipc-send 'unsubscribe (current-room))
-    (refresh-messageswin)))
+    (refresh-current-window)))
 
 
 ;; Commands
@@ -257,14 +266,20 @@
                                 ...))
     ((_ sym arg . body) (define-command (sym) arg . body))))
 
+(define-command (window w r) args
+  (switch-window (string->symbol (string-downcase (string-join args)))))
 
-(define-command (room r) args
-  (cond ((null? args)
-         (void))
-        ((char=? #\! (string-ref (car args) 0))
-         (switch-room (string->symbol (car args))))
+(define-command rename args
+  (cond ((= (length args) 1)
+         (rename-window *current-window*
+                        (string->symbol (car args))))
+        ((= (length args) 2)
+         (rename-window (string->symbol (car args))
+                        (string->symbol (cadr args))))
         (else
-          (switch-room (ipc-query 'find-room (string-join args))))))
+          (special-window-write 'ensemble "rename: wrong number of arguments"))))
+
+#; (define-command say args …) ; TODO
 
 (define-command me args
   (ipc-send 'message:emote (current-room) (string-join args " ")))

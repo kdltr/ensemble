@@ -7,6 +7,7 @@
   (chicken format)
   (chicken irregex)
   (chicken pathname)
+  (chicken plist)
   (chicken process-context)
   (chicken process)
   (chicken process signal)
@@ -80,13 +81,124 @@
        (set! *queries* (delete! pair *queries*))
        (task datum)))
 
-(define current-room (make-parameter #f))
-
 (define *notifications* '())
 (define *highlights* '())
 (define *read-marker* #f)
 
 (define *rooms-offset* '())
+
+
+;; Windows
+;; =======
+
+;; each window must have:
+;; - an associated room id
+;; - an associated worker/backend/profile
+;; - a text / ID
+;; - a notification and highlight count
+
+;; except for a special frontend window and special backend/profile windows
+
+(define *current-window* 'ensemble)
+(define *special-windows* '(ensemble backend))
+(define *room-windows* '())
+(define *free-window-number* 0)
+
+;; TODO remove
+(define (current-room)
+  (window-room *current-window*))
+
+(define (special-window-log win)
+  (or (get win 'log) '()))
+
+(define (special-window-write id fmt . args)
+  (assert (special-window? id))
+  (let* ((str (sprintf "~?" fmt args)))
+    (put! id 'log (cons str (special-window-log id)))
+    (when (eqv? id *current-window*)
+      (maybe-newline)
+      (wprintw messageswin "~a" str))))
+
+(define (special-window? id)
+  (memv id *special-windows*))
+
+(define (room-window? id)
+  (not (special-window? id)))
+
+(define (window-room win)
+  (get win 'room-id))
+
+(define (window-name win)
+  (cond ((special-window? win)
+         (symbol->string win))
+        (else
+          (room-display-name (window-room win)))))
+
+(define (add-room-window room-id)
+  (let ((id (string->symbol (->string (inc! *free-window-number*)))))
+    (put! id 'room-id room-id)
+    (put! id 'profile 'default) ;; TODO change that when multiple profiles are there
+    (set! *room-windows*
+      (append! *room-windows* (list id)))))
+
+(define (rename-window from to)
+  (let ((plist (symbol-plist from)))
+    (cond ((special-window? from)
+           (special-window-write 'ensemble
+                                 "You can’t rename the special window: ~a"
+                                 from))
+          (else
+            (set! (symbol-plist to) plist)
+            (set! (symbol-plist from) '())
+            (set! *room-windows*
+              (cons to (delete! from *room-windows*)))
+            (switch-window to)))))
+
+(define (switch-window id)
+  (cond ((special-window? id)
+         (switch-special-window id))
+        (else
+          (switch-room-window id))))
+
+(define (switch-special-window id)
+  (set! *current-window* id)
+  (refresh-statuswin)
+  (refresh-current-window))
+
+(define (switch-room-window id)
+  (let ((current-room-id (window-room *current-window*))
+        (room-id (window-room id)))
+    (cond (room-id
+           (when current-room-id
+             (ipc-send 'unsubscribe current-room-id))
+           (set! *current-window* id)
+           (ipc-send 'subscribe id)
+           (refresh-statuswin)
+           (refresh-current-window))
+          (else
+            (special-window-write 'ensemble "No such room exist: ~a" id)))))
+
+(define (refresh-current-window)
+  (cond ((special-window? *current-window*)
+         (refresh-special-window *current-window*))
+        (else
+          (refresh-room-window *current-window*))))
+
+(define (refresh-room-window id)
+  (maybe-newline)
+  (wprintw messageswin "Loading…~%")
+  (let ((room-id (window-room id)))
+    (ipc-send 'fetch-events room-id rows
+            (room-offset room-id))))
+
+(define (refresh-special-window id)
+  (wclear messageswin)
+  (for-each
+    (lambda (str)
+      (maybe-newline)
+      (wprintw messageswin "~a" str))
+    (reverse (special-window-log id))))
+
 
 
 ;; DB Replacement
@@ -120,25 +232,23 @@
   (init_pair 2 COLOR_BLUE COLOR_WHITE)
   (init_pair 3 COLOR_CYAN COLOR_BLACK)
   (wbkgdset statuswin (COLOR_PAIR 1))
-  (wprintw messageswin "Loading…~%")
-  (wrefresh messageswin)
-  )
+  (special-window-write 'ensemble "Loading…"))
 
 (define (waddstr* win str)
   (handle-exceptions exn #t
     (waddstr win str)))
 
 (define (refresh-statuswin)
-  (let* ((regular-notifs (lset-difference eqv? *notifications* *highlights*))
-         (highlights-names (map room-display-name *highlights*))
-         (notifs-names (map room-display-name regular-notifs))
-         (room-name (room-display-name (current-room))))
+  (let* ((room-name (window-name *current-window*)))
     (werase statuswin)
     (waddstr* statuswin (sprintf "Room: ~a | " room-name))
-    (wcolor_set statuswin 2 #f) ;; highlight foreground
-    (waddstr* statuswin (sprintf "~a" (string-join highlights-names " " 'suffix)))
-    (wcolor_set statuswin 1 #f) ;; regular foreground
-    (waddstr* statuswin (sprintf "~a" (string-join notifs-names " ")))))
+    (for-each
+      (lambda (win)
+        (waddstr* statuswin
+                  (if (eqv? win *current-window*)
+                      (sprintf "[~a] " win)
+                      (sprintf "~a " win))))
+      (append *special-windows* *room-windows*))))
 
 (define (room-offset room-id)
   (alist-ref room-id *rooms-offset* equal? 0))
@@ -151,25 +261,10 @@
   (set! *rooms-offset*
     (alist-delete! room-id *rooms-offset* equal?)))
 
-(define (refresh-messageswin)
-  (ipc-send 'fetch-events (current-room) rows
-            (room-offset (current-room))))
-
 (define (maybe-newline)
   (let ((l c (getyx messageswin)))
     (unless (zero? c) (wprintw messageswin "~%"))))
 
-(define (switch-room room-id)
-  (if room-id
-      (begin
-        (when (current-room)
-          (ipc-send 'unsubscribe (current-room)))
-        (current-room room-id)
-        (ipc-send 'subscribe (current-room))
-        (refresh-statuswin)
-        (refresh-messageswin)
-        )
-      #f))
 
 
 (define (run)
@@ -180,10 +275,11 @@
           (gochan-send *user-channel* 'resize)))))
   (set! (signal-handler signal/int)
     (lambda (_) (reset)))
-  (info-port (open-output-file "frontend.log"))
+  (cond-expand (debug (info-port (open-output-file "frontend.log"))) (else))
+  (load-config)
+  (on-exit save-config)
   (start-interface)
-  (wprintw messageswin "Starting backend…~%")
-  (wrefresh messageswin)
+  (special-window-write 'ensemble "Starting backend…")
   (set! worker
     (start-worker 'default
       (lambda ()
@@ -193,11 +289,18 @@
                               '("default"))))))
   (thread-start! user-read-loop)
   (thread-start! (lambda () (worker-read-loop worker)))
-  (wprintw messageswin "Connecting…~%")
-  (wrefresh messageswin)
   (ipc-send 'connect)
-  (switch-room (ipc-query 'any-room))
+  (let ((joined-rooms (ipc-query 'joined-rooms)))
+    (special-window-write 'ensemble "Rooms joined: ~s" joined-rooms)
+    (for-each add-room-window joined-rooms))
   (main-loop))
+
+(define (load-config)
+  (void))
+
+(define (save-config)
+  (void))
+
 
 (define (process-execute* exec args)
   (handle-exceptions exn #f
@@ -234,7 +337,7 @@
     (mvwin statuswin (- rows 2) 0)
     (wresize inputwin 1 cols)
     (mvwin inputwin (- rows 1) 0)
-    (refresh-messageswin)
+    (refresh-current-window)
     (refresh-statuswin)
     (refresh-inputwin)))
 
@@ -255,14 +358,14 @@
          (when (equal? (cadr msg) (current-room))
            (werase messageswin)))
         ((refresh)
-         (when (equal? (cadr msg) (current-room))
-           (refresh-messageswin)))
+         (when (equal? (cadr msg) (window-room *current-window*))
+           (refresh-current-window)))
         ((response)
          (apply handle-query-response (cdr msg)))
         ((read-marker)
          (when (equal? (cadr msg) (current-room))
            (set! *read-marker* (symbol->string (caddr msg)))
-           (refresh-messageswin)))
+           (refresh-current-window)))
         ((message)
          (when (equal? (cadr msg) (current-room))
            (maybe-newline)
@@ -275,6 +378,8 @@
                          *read-marker*)
              (wprintw messageswin "~A" (make-string cols #\-)))
            ))
+        ((info)
+         (special-window-write 'backend "~a" (cadr msg)))
         (else (info "Unknown message from backend: ~a" msg))
         )))
 
