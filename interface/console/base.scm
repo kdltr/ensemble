@@ -35,6 +35,8 @@
 
 (include-relative "input.scm")
 
+(define +backend-executable+ "ensemble.backend.matrix")
+
 (define tty-fileno 0)
 (define rows)
 (define cols)
@@ -185,11 +187,10 @@
   (set! worker
     (start-worker 'default
       (lambda ()
-        (let ((profile-dir (make-pathname (config-home) "default"))
-              (src-dir (current-directory)))
-          (create-directory profile-dir #t)
-          (change-directory profile-dir)
-          (process-execute (make-pathname src-dir "ensemble.backend.matrix"))))))
+        (or (process-execute* +backend-executable+ '("default"))
+            (process-execute* (make-pathname (current-directory)
+                                             +backend-executable+)
+                              '("default"))))))
   (thread-start! user-read-loop)
   (thread-start! (lambda () (worker-read-loop worker)))
   (wprintw messageswin "Connecting…~%")
@@ -197,6 +198,10 @@
   (ipc-send 'connect)
   (switch-room (ipc-query 'any-room))
   (main-loop))
+
+(define (process-execute* exec args)
+  (handle-exceptions exn #f
+    (process-execute exec args)))
 
 (define (main-loop)
   (info "INTERFACE REFRESH")
