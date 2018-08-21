@@ -1,5 +1,5 @@
-ensemble:
+build:
 	./build.sh
 
-run: ensemble
-	./ensemble
+run: build
+	./run.sh
