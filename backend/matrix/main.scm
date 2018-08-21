@@ -54,15 +54,23 @@
 (define (run)
   (set! *lock-file* (file-open "lock"
                               (bitwise-ior open/rdwr open/creat)
-                              (bitwise-ior perm/irusr perm/iwusr)
-                              ))
+                              (bitwise-ior perm/irusr perm/iwusr)))
   (handle-exceptions exn
     (error "This profile is already in use")
     (file-lock (open-output-file* *lock-file*)))
-  (current-error-port (open-output-file "backend.log"))
-  (info-port (current-error-port))
-  (current-input-port (open-input-file*/nonblocking 0))
-  (current-output-port (open-output-file*/nonblocking 1))
+  (let ((err-port (open-output-file "backend.log"))
+        (in-port (open-input-file*/nonblocking 0))
+        (out-port (open-output-file*/nonblocking 1)))
+    (current-error-port err-port)
+    (info-port err-port)
+    (current-input-port in-port)
+    (current-output-port out-port)
+    (on-exit (lambda ()
+               (info "EXITING")
+               (when *next-batch* (save-state))
+               (close-output-port err-port)
+               (close-output-port out-port)
+               (close-input-port in-port))))
   ;; Enable server certificate validation for https URIs.
   (http:server-connector
     (make-ssl-server-connector
@@ -111,7 +119,7 @@
 (define (handle-rpc exp)
   (info "received: ~s" exp)
   (if (eof-object? exp)
-      (save-and-exit)
+      (exit)
       (handle-exceptions exn
         (begin
           (cond-expand
@@ -124,10 +132,6 @@
                                 (map (lambda (o) (list 'quote o))
                                      (cdr exp)))))
           (safe-eval quoted-exp environment: rpc-env)))))
-
-(define (save-and-exit)
-  (when *next-batch* (save-state))
-  (exit))
 
 (define (exception->string exn)
   (with-output-to-string

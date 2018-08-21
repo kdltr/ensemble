@@ -66,13 +66,17 @@
   *rooms*)
 
 (define (save-state)
+  (info "State saving started")
   (with-output-to-file "state"
     (lambda ()
       (for-each
-        (lambda (r) (write `(room ,r ,(symbol-plist r)))
-                    (newline))
+        (lambda (r)
+          (info "Saving state for: ~a" r)
+          (write `(room ,r ,(symbol-plist r)))
+          (newline))
         *rooms*)
-      (write `(next-batch ,*next-batch*)))))
+      (write `(next-batch ,*next-batch*))))
+  (info "Done saving state"))
 
 (define (load-state)
   (define (load exp)
