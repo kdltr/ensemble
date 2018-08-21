@@ -288,10 +288,10 @@
   (set! worker
     (start-worker 'default
       (lambda ()
-        (or (process-execute* +backend-executable+ '("default"))
-            (process-execute* (make-pathname (current-directory)
+        (or (process-execute* (make-pathname (current-directory)
                                              +backend-executable+)
-                              '("default"))))))
+                              '("default"))
+            (process-execute* +backend-executable+ '("default"))))))
   (thread-start! user-read-loop)
   (thread-start! (lambda () (worker-read-loop worker)))
   (ipc-send 'connect)
