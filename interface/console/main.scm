@@ -2,6 +2,7 @@
 (import
   scheme
   (chicken base)
+  (chicken bitwise)
   (chicken condition)
   (chicken file)
   (chicken format)
@@ -221,27 +222,42 @@
 ;; TUI
 ;; ===
 
+(define STATUS_PAIR 1)
+(define STATUS_HIGHLIGHT_PAIR 2)
+(define STATUS_LOWLIGHT_PAIR 3)
+(define MESSAGE_HIGHLIGHT_PAIR 4)
+(define STATUS_LOWLIGHT_ATTRS)
+(define STATUS_HIGHLIGHT_ATTRS)
+(define STATUS_NORMAL_ATTRS)
+
+(define (initialize-attributes)
+  (start_color)
+  (init_pair STATUS_PAIR COLOR_BLACK COLOR_WHITE)
+  (init_pair STATUS_HIGHLIGHT_PAIR COLOR_BLUE COLOR_WHITE)
+  (init_pair STATUS_LOWLIGHT_PAIR COLOR_WHITE COLOR_WHITE)
+  (init_pair MESSAGE_HIGHLIGHT_PAIR COLOR_CYAN COLOR_BLACK)
+  (set! STATUS_LOWLIGHT_ATTRS
+    (bitwise-ior (COLOR_PAIR STATUS_LOWLIGHT_PAIR) A_DIM))
+  (set! STATUS_HIGHLIGHT_ATTRS
+    (COLOR_PAIR STATUS_HIGHLIGHT_PAIR))
+  (set! STATUS_NORMAL_ATTRS
+    (COLOR_PAIR STATUS_PAIR)))
+
 (define (start-interface)
   ;; Make ncurses wait less time when receiving an ESC character
   (set-environment-variable! "ESCDELAY" "20")
-
   (initscr)
   (noecho)
   (cbreak)
-  (start_color)
+  (initialize-attributes)
   (set!-values (rows cols) (getmaxyx (stdscr)))
-
   (set! messageswin (newwin (- rows 2) cols 0 0))
   (scrollok messageswin #t)
   (idlok messageswin #t)
-
   (set! inputwin (newwin 1 cols (- rows 1) 0))
   (keypad inputwin #t)
   (set! statuswin (newwin 1 cols (- rows 2) 0))
-  (init_pair 1 COLOR_BLACK COLOR_WHITE)
-  (init_pair 2 COLOR_BLUE COLOR_WHITE)
-  (init_pair 3 COLOR_CYAN COLOR_BLACK)
-  (wbkgdset statuswin (COLOR_PAIR 1))
+  (wbkgdset statuswin (COLOR_PAIR STATUS_PAIR))
   (special-window-write 'ensemble "Loading…"))
 
 (define (waddstr* win str)
@@ -262,16 +278,16 @@
                          (list win)
                          (list win
                                (if (zero? hls) "" hls)
-                               (if (zero? notifs) "" notifs)))))
-          (cond ((> hls 0) (wcolor_set statuswin 2 #f))
-                ((> notifs 0) (wcolor_set statuswin 1 #f))
-                (else (wattron statuswin A_DIM)))
+                               (if (zero? notifs) "" notifs))))
+               (attrs (cond ((> hls 0) STATUS_HIGHLIGHT_ATTRS)
+                            ((> notifs 0) STATUS_NORMAL_ATTRS)
+                            (else STATUS_LOWLIGHT_ATTRS))))
+          (wattron statuswin attrs)
           (waddstr* statuswin
                     (if (eqv? win *current-window*)
                         (sprintf "[~?] " fmt args)
                         (sprintf "~? " fmt args)))
-          (wcolor_set statuswin 0 #f)
-          (wattroff statuswin A_DIM)
+          (wattroff statuswin attrs)
           ))
       (append *special-windows* *room-windows*))))
 
@@ -414,7 +430,7 @@
          (when (equal? (cadr msg) (current-room))
            (maybe-newline)
            (when (alist-ref 'highlight (caddr msg))
-             (wcolor_set messageswin 3 #f))
+             (wcolor_set messageswin MESSAGE_HIGHLIGHT_PAIR #f))
            (wprintw messageswin "~A"
                     (alist-ref 'formated (caddr msg)))
            (wcolor_set messageswin 0 #f)
