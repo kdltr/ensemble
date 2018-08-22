@@ -47,7 +47,7 @@
               "backend/matrix/client.scm"))
    ;; Console interface
    (extension ensemble.interface.console
-              (source "interface/console/base.scm")
+              (source "interface/console/main.scm")
               (source-dependencies
                 "interface/console/input.scm")
               (component-dependencies
