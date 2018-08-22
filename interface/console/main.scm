@@ -148,7 +148,8 @@
                          (id (string->symbol (->string *free-window-number*))))
   (unless (any (lambda (win) (eqv? (get win 'room-id) room-id)) *room-windows*)
     (let ((n (string->number (symbol->string id))))
-      (when n (set! *free-window-number* (add1 n))))
+      (when (and n (> n *free-window-number*))
+        (set! *free-window-number* (add1 n))))
     (put! id 'room-id room-id)
     (put! id 'profile 'default) ;; TODO change that when multiple profiles are there
     (set! *room-windows*
