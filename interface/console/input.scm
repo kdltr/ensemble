@@ -284,14 +284,16 @@
   (switch-window (string->symbol (string-downcase (string-join args)))))
 
 (define-command rename args
-  (cond ((= (length args) 1)
-         (rename-window *current-window*
-                        (string->symbol (car args))))
-        ((= (length args) 2)
-         (rename-window (string->symbol (car args))
-                        (string->symbol (cadr args))))
-        (else
-          (special-window-write 'ensemble "rename: wrong number of arguments"))))
+  (let ((target (string->symbol (string-join args ""))))
+    (cond ((null? args)
+           (special-window-write 'ensemble
+                                 "usage: /rename NEW-NAME"))
+          ((room-window? target)
+           (special-window-write 'ensemble
+                                 "rename: the '~a' window already exists"
+                                 target))
+           (else
+             (rename-window *current-window* target)))))
 
 (define-command say args
   (when (room-window? *current-window*)

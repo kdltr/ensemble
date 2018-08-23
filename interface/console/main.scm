@@ -31,11 +31,10 @@
   (ensemble libs locations))
 
 ;; TODO “markup” for events
-;; TODO persistent room numbering (irssi-like)
-;; TODO special “log” room for backend informations / errors
-;; TODO history navigation
+;; TODO better history navigation
 ;; TODO read marker
 ;; TODO support for multiple profiles/backends
+;; TODO (code quality) exceptions that write messages to the “ensemble” windows
 
 (include-relative "input.scm")
 
@@ -214,6 +213,10 @@
               (merge! (delete! from *room-windows*)
                       (list to)
                       window<?))
+            (let ((maybe-num (string->number (symbol->string to))))
+              (when maybe-num
+                (set! *free-window-number*
+                  (max *free-window-number* (add1 maybe-num)))))
             (switch-window to)))))
 
 (define (switch-window id)
