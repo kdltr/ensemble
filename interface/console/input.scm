@@ -284,7 +284,7 @@
   (switch-window (string->symbol (string-downcase (string-join args)))))
 
 (define-command rename args
-  (let ((target (string->symbol (string-join args ""))))
+  (let ((target (string->symbol (string-join args " "))))
     (cond ((null? args)
            (special-window-write 'ensemble
                                  "usage: /rename NEW-NAME"))

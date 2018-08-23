@@ -159,7 +159,7 @@
   (memv id *special-windows*))
 
 (define (room-window? id)
-  (not (special-window? id)))
+  (memv id *room-windows*))
 
 (define (window-has-highlight? win)
   (let ((hls notifs (window-notifications win)))
