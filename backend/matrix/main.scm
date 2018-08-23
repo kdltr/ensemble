@@ -194,9 +194,11 @@
 (safe-environment-set!
   rpc-env 'subscribe
   (lambda (room-id)
-    (put! room-id 'frontend-subscribed #t)
-    (and-let* ((mark (get room-id 'read-marker)))
-      (ipc-send 'read-marker room-id mark))))
+    (cond ((memv room-id (joined-rooms))
+           (put! room-id 'frontend-subscribed #t)
+           (and-let* ((mark (get room-id 'read-marker)))
+                (ipc-send 'read-marker room-id mark)))
+          (else (ipc-info "Unable to subscribe to unknown room: ~a" room-id)))))
 
 (safe-environment-set!
   rpc-env 'unsubscribe
