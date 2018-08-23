@@ -293,7 +293,9 @@
         (else
           (special-window-write 'ensemble "rename: wrong number of arguments"))))
 
-#; (define-command say args …) ; TODO
+(define-command say args
+  (when (room-window? *current-window*)
+    (ipc-send 'message:text (current-room) (string-join args " "))))
 
 (define-command me args
   (ipc-send 'message:emote (current-room) (string-join args " ")))
