@@ -59,9 +59,6 @@
 (define *rooms* '())
 (define *next-batch* #f)
 
-(define (any-room)
-  (and (pair? *rooms*) (car *rooms*)))
-
 (define (joined-rooms)
   *rooms*)
 

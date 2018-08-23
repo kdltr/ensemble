@@ -3,6 +3,7 @@
 ;; TODO Environment variables for config and cache/state directories
 ;; TODO Show the result of message sending and read marker immediately
 ;; TODO profile locking to avoid multiple instances using the same profiles
+;; TODO send a room-name message when a room name change event is received
 
 (module (ensemble backend matrix) (run)
 (import
@@ -219,6 +220,7 @@
         holes)
       (ipc-send 'bundle-start)
       (ipc-send 'clear room-id)
+      (ipc-send 'room-name room-id (room-display-name room-id))
       (for-each
         (lambda (m)
           (ipc-send 'message room-id (cleanup-event m)))
@@ -247,11 +249,10 @@
   rpc-env 'query
   (lambda (query-id what . args)
     (let ((pred (case what
-                  ((any-room joined-rooms) (lambda () (pair? (joined-rooms))))
+                  ((joined-rooms) (lambda () (pair? (joined-rooms))))
                   (else yes)))
           (proc (case what
                   ((find-room) find-room)
-                  ((any-room) any-room)
                   ((joined-rooms) joined-rooms)
                   ((room-members) query-room-members)
                   ((room-display-name) room-display-name)

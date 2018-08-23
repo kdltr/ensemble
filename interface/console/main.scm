@@ -101,6 +101,7 @@
 
 ;; except for a special frontend window and special backend/profile windows
 
+(define *current-room-name* "")
 (define *current-window* 'ensemble)
 (define *special-windows* '(ensemble backend))
 (define *room-windows* '())
@@ -109,6 +110,11 @@
 ;; TODO remove
 (define (current-room)
   (window-room *current-window*))
+
+(define (current-window-name)
+  (if (special-window? *current-window*)
+      (symbol->string *current-window*)
+      *current-room-name*))
 
 (define (special-window-log win)
   (or (get win 'log) '()))
@@ -137,12 +143,6 @@
 
 (define (window-room win)
   (get win 'room-id))
-
-(define (window-name win)
-  (cond ((special-window? win)
-         (symbol->string win))
-        (else
-          (room-display-name (window-room win)))))
 
 (define (window-notifications win)
   (cond ((special-window? win)
@@ -220,14 +220,6 @@
     (reverse (special-window-log id))))
 
 
-
-;; DB Replacement
-;; ==============
-
-(define (room-display-name id)
-  (ipc-query 'room-display-name id))
-
-
 ;; TUI
 ;; ===
 
@@ -274,31 +266,29 @@
     (waddstr win str)))
 
 (define (refresh-statuswin)
-  (let* ((room-name (window-name *current-window*)))
-    (werase statuswin)
-    (waddstr* statuswin (sprintf "Room: ~a | " room-name))
-    (for-each
-      (lambda (win)
-        (let* ((hls notifs (window-notifications win))
-               (fmt (if (and (zero? hls) (zero? notifs))
-                        "~a"
-                        "~a(~a:~a)"))
-               (args (if (and (zero? hls) (zero? notifs))
-                         (list win)
-                         (list win
-                               (if (zero? hls) "" hls)
-                               (if (zero? notifs) "" notifs))))
-               (attrs (cond ((> hls 0) STATUS_HIGHLIGHT_ATTRS)
-                            ((> notifs 0) STATUS_NORMAL_ATTRS)
-                            (else STATUS_LOWLIGHT_ATTRS))))
-          (wattron statuswin attrs)
-          (waddstr* statuswin
-                    (if (eqv? win *current-window*)
-                        (sprintf "[~?] " fmt args)
-                        (sprintf "~? " fmt args)))
-          (wattroff statuswin attrs)
-          ))
-      (append *special-windows* *room-windows*))))
+  (werase statuswin)
+  (waddstr* statuswin (sprintf "Room: ~a | " (current-window-name)))
+  (for-each
+    (lambda (win)
+      (let* ((hls notifs (window-notifications win))
+             (fmt (if (and (zero? hls) (zero? notifs))
+                      "~a"
+                      "~a(~a:~a)"))
+             (args (if (and (zero? hls) (zero? notifs))
+                       (list win)
+                       (list win
+                             (if (zero? hls) "" hls)
+                             (if (zero? notifs) "" notifs))))
+             (attrs (cond ((> hls 0) STATUS_HIGHLIGHT_ATTRS)
+                          ((> notifs 0) STATUS_NORMAL_ATTRS)
+                          (else STATUS_LOWLIGHT_ATTRS))))
+        (wattron statuswin attrs)
+        (waddstr* statuswin
+                  (if (eqv? win *current-window*)
+                      (sprintf "[~?] " fmt args)
+                      (sprintf "~? " fmt args)))
+        (wattroff statuswin attrs)))
+    (append *special-windows* *room-windows*)))
 
 (define (room-offset room-id)
   (alist-ref room-id *rooms-offset* equal? 0))
@@ -435,6 +425,10 @@
          (when (equal? (cadr msg) (current-room))
            (set! *read-marker* (symbol->string (caddr msg)))
            (refresh-current-window)))
+        ((room-name)
+         (when (equal? (cadr msg) (current-room))
+           (set! *current-room-name* (caddr msg))
+           (refresh-statuswin)))
         ((message)
          (when (equal? (cadr msg) (current-room))
            (maybe-newline)
