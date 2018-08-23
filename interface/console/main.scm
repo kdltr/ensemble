@@ -150,9 +150,11 @@
   (assert (special-window? id))
   (let* ((str (sprintf "~?" fmt args)))
     (put! id 'log (cons str (special-window-log id)))
+    (put! id 'notifications (add1 (or (get id 'notifications) 0)))
     (when (eqv? id *current-window*)
       (maybe-newline)
-      (wprintw messageswin "~a" str))))
+      (wprintw messageswin "~a" str)))
+  (refresh-statuswin))
 
 (define (special-window? id)
   (memv id *special-windows*))

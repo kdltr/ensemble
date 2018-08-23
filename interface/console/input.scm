@@ -143,8 +143,11 @@
 (define-key #\newline
   (cond ((or (string=? "" input-string)
              (string-every char-set:white-space input-string))
-         (when (room-window? *current-window*)
-           (ipc-send 'mark-last-message-as-read (current-room))))
+         (cond ((room-window? *current-window*)
+                (ipc-send 'mark-last-message-as-read (current-room)))
+               ((special-window? *current-window*)
+                (put! *current-window* 'notifications 0)
+                (refresh-statuswin))))
         ((char=? (string-ref input-string 0) #\/)
          (handle-command input-string))
         ((room-window? *current-window*)
