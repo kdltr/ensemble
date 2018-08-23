@@ -14,6 +14,7 @@
   (chicken process)
   (chicken process signal)
   (chicken repl)
+  (chicken sort)
   srfi-1
   srfi-18
   srfi-71
@@ -83,8 +84,6 @@
        (set! *queries* (delete! pair *queries*))
        (task datum)))
 
-(define *notifications* '())
-(define *highlights* '())
 (define *read-marker* #f)
 
 (define *rooms-offset* '())
@@ -107,9 +106,37 @@
 (define *room-windows* '())
 (define *free-window-number* 0)
 
+
+(define *window-associations* '())
+
+(define (set-window-association! profile room window)
+  (let ((profile-assoc (alist-ref profile *window-associations* equal? '())))
+    (set! *window-associations*
+      (alist-update! profile
+                     (alist-update! room window profile-assoc equal?)
+                     *window-associations*
+                     equal?))))
+
+(define (window-association profile room)
+  (alist-ref room
+             (alist-ref profile *window-associations* equal? '())
+             equal?
+             #f))
+
+
 ;; TODO remove
 (define (current-room)
   (window-room *current-window*))
+
+(define (window<? w1 w2)
+  (let* ((str1 (symbol->string w1))
+         (str2 (symbol->string w2))
+         (num1 (string->number str1))
+         (num2 (string->number str2)))
+    (cond ((and num1 num2)  (< num1 num2))
+          (num1 #f)
+          (num2 #t)
+          (else  (string<? str1 str2)))))
 
 (define (current-window-name)
   (if (special-window? *current-window*)
@@ -144,24 +171,31 @@
 (define (window-room win)
   (get win 'room-id))
 
-(define (window-notifications win)
-  (cond ((special-window? win)
-         (values 0 0))
-        (else
-          (let ((room-id (window-room win)))
-            (values (or (get room-id 'highlights) 0)
-                    (or (get room-id 'notifications) 0))))))
+(define (window-for-room room-id)
+  (find (lambda (w) (equal? room-id (window-room w)))
+        *room-windows*))
 
-(define (add-room-window room-id #!optional
-                         (id (string->symbol (->string *free-window-number*))))
-  (unless (any (lambda (win) (eqv? (get win 'room-id) room-id)) *room-windows*)
-    (let ((n (string->number (symbol->string id))))
-      (when (and n (>= n *free-window-number*))
-        (set! *free-window-number* (add1 n))))
-    (put! id 'room-id room-id)
-    (put! id 'profile 'default) ;; TODO change that when multiple profiles are there
-    (set! *room-windows*
-      (append! *room-windows* (list id)))))
+(define (window-profile win)
+  (get win 'profile))
+
+(define (window-notifications win)
+  (values (or (get win 'highlights) 0)
+          (or (get win 'notifications) 0)))
+
+(define (add-room-window room-id)
+  (define (do-add)
+    (let* ((num-id (string->symbol (->string (add1 *free-window-number*))))
+           (window (or (window-association "default" room-id)
+                       num-id)))
+      (when (eqv? window num-id)
+        (set! *free-window-number* (add1 *free-window-number*)))
+      (set-window-association! "default" room-id window)
+      (put! window 'room-id room-id)
+      (put! window 'profile "default") ;; TODO change that when multiple profiles are there
+      (set! *room-windows*
+        (merge! *room-windows* (list window) window<?))
+      window))
+  (or (window-for-room room-id) (do-add)))
 
 (define (rename-window from to)
   (let ((plist (symbol-plist from)))
@@ -170,10 +204,14 @@
                                  "You can’t rename the special window: ~a"
                                  from))
           (else
+            (let ((room-id (window-room from)))
+              (set-window-association! "default" room-id to))
             (set! (symbol-plist to) plist)
             (set! (symbol-plist from) '())
             (set! *room-windows*
-              (cons to (delete! from *room-windows*)))
+              (merge! (delete! from *room-windows*)
+                      (list to)
+                      window<?))
             (switch-window to)))))
 
 (define (switch-window id)
@@ -218,6 +256,30 @@
       (maybe-newline)
       (wprintw messageswin "~a" str))
     (reverse (special-window-log id))))
+
+(define (load-windows-associations)
+  (let ((path (make-pathname (config-home) "window-associations")))
+    (when (file-exists? path)
+      (with-input-from-file path
+        (lambda ()
+          (port-for-each
+            (lambda (exp)
+              (case (car exp)
+                ((associations)
+                 (set! *window-associations* (cadr exp)))
+                ((free-window-number)
+                 (set! *free-window-number* (cadr exp)))
+                (else
+                  (special-window-write 'ensemble "Unknown config expression: ~s"
+                                        exp))))
+             read))))))
+
+(define (save-windows-associations)
+  (with-output-to-file (make-pathname (config-home) "window-associations")
+    (lambda ()
+      (write (list 'associations *window-associations*))
+      (write (list 'free-window-number *free-window-number*)))))
+
 
 
 ;; TUI
@@ -337,28 +399,11 @@
   (main-loop))
 
 (define (load-config)
-  (let ((path (make-pathname (config-home) "interface-windows")))
-    (when (file-exists? path)
-      (with-input-from-file path
-        (lambda ()
-          (port-for-each
-            (lambda (exp)
-              (case (car exp)
-                ((window)
-                 (add-room-window (caddr exp) (cadr exp)))
-                (else
-                  (special-window-write 'ensemble "Unknown config expression: ~s"
-                                        exp))))
-             read))))))
+  ;; TODO validate each config file
+  (load-windows-associations))
 
 (define (save-config)
-  (with-output-to-file (make-pathname (config-home) "interface-windows")
-    (lambda ()
-      (for-each
-        (lambda (win)
-          (write `(window ,win ,(window-room win))))
-        *room-windows*))))
-
+  (save-windows-associations))
 
 (define (process-execute* exec args)
   (handle-exceptions exn #f
@@ -409,9 +454,9 @@
            handle-backend-response
            (collect-bundle-messages)))
         ((notifications)
-         (let ((room-id (cadr msg)))
-           (put! room-id 'highlights (caddr msg))
-           (put! room-id 'notifications (cadddr msg))
+         (let ((window (add-room-window (cadr msg))))
+           (put! window 'highlights (caddr msg))
+           (put! window 'notifications (cadddr msg))
            (refresh-statuswin)))
         ((clear)
          (when (equal? (cadr msg) (current-room))
