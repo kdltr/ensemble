@@ -127,6 +127,14 @@
 (define (room-window? id)
   (not (special-window? id)))
 
+(define (window-has-highlight? win)
+  (let ((hls notifs (window-notifications win)))
+    (not (zero? hls))))
+
+(define (window-has-notification? win)
+  (let ((hls notifs (window-notifications win)))
+    (not (zero? notifs))))
+
 (define (window-room win)
   (get win 'room-id))
 

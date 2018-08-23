@@ -202,15 +202,17 @@
     (unless (= old-pos new-pos)
       (delete-word-right))))
 
-#;(define-key #(#\escape #\n)
-  (let* ((notifs (append *highlights* *notifications*))
-         (inside (memv (current-room) notifs)))
-    (unless (null? notifs)
-      (if inside
-          (if (null? (cdr inside))
-              (switch-room (car notifs))
-              (switch-room (cadr inside)))
-          (switch-room (car notifs))))))
+(define-key #\x0e ;; C-n
+  (switch-to-adjacent (append *special-windows* *room-windows*)))
+
+(define-key #\x10 ;; C-p
+  (switch-to-adjacent (reverse (append *special-windows* *room-windows*))))
+
+(define-key #(#\escape #\n)
+  (switch-to-adjacent (cons *current-window* (weighted-windows-list))))
+
+(define-key #(#\escape #\p)
+  (switch-to-adjacent (cons *current-window* (reverse (weighted-windows-list)))))
 
 (define (switch-to-adjacent windows)
   (let ((current-position (memv *current-window* windows)))
@@ -220,11 +222,20 @@
           (car windows)
           (cadr current-position)))))
 
-(define-key #\x0e ;; C-n
-  (switch-to-adjacent (append *special-windows* *room-windows*)))
+(define (weighted-windows-list)
+  (define (merge a b)
+    (append a (fold-right (lambda (o l) (if (memv o a) l (cons o l)))
+                          '() b)))
+  (let* ((all-windows (append *special-windows* *room-windows*))
+         (before-current after-current
+          (break (lambda (w) (eqv? w *current-window*))
+                 all-windows))
+         (ordered (append (if (pair? after-current) (cdr after-current) '())
+                          before-current))
+         (highlighted (filter window-has-highlight? ordered))
+         (notified (filter window-has-notification? ordered)))
+    (merge highlighted notified)))
 
-(define-key #\x10 ;; C-p
-  (switch-to-adjacent (reverse (append *special-windows* *room-windows*))))
 
 ;; History down
 (define-key KEY_NPAGE
