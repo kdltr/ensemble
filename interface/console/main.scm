@@ -32,9 +32,10 @@
 
 ;; TODO “markup” for events
 ;; TODO better history navigation
-;; TODO read marker
 ;; TODO support for multiple profiles/backends
 ;; TODO (code quality) exceptions that write messages to the “ensemble” windows
+;; TODO title bar for room name and topic
+;; TODO dynamic sizing of the status bar
 
 (include-relative "input.scm")
 
