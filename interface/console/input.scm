@@ -302,5 +302,15 @@
 (define-command me args
   (ipc-send 'message:emote (current-room) (string-join args " ")))
 
+(define-command list args
+  (special-window-write 'ensemble "beginning of list")
+  (for-each
+    (lambda (window)
+      (special-window-write
+        'ensemble "~a: ~a"
+         window (ipc-query 'room-display-name (window-room window))))
+    *room-windows*)
+  (special-window-write 'ensemble "end of list"))
+
 (define-command (exit quit) args
   (exit))
