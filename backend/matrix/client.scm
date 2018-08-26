@@ -6,7 +6,8 @@
          (last-evt (if (pair? tl) (car tl) '()))
          (evt-id (mref '(event_id) last-evt)))
     (when evt-id
-      (room-mark-read room-id evt-id))))
+      (room-mark-read room-id evt-id)
+      evt-id)))
 
 (define (room-display-name id)
   (let ((ctx (and id (room-context id))))

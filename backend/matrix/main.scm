@@ -1,7 +1,7 @@
 ;; TODO Better error reporting and recovery
-;; TODO Empty profile
 ;; TODO Environment variables for config and cache/state directories
-;; TODO Show the result of message sending and read marker immediately
+;; TODO Show the result of message sending immediately
+;; TODO Make a queue of messages to send, to avoid reordering
 ;; TODO profile locking to avoid multiple instances using the same profiles
 ;; TODO send a room-name message when a room name change event is received
 
@@ -251,8 +251,9 @@
 
 (safe-environment-set!
   rpc-env 'mark-last-message-as-read
-  (lambda (id)
-    (mark-last-message-as-read id)))
+  (lambda (room-id)
+    (let ((evt-id (mark-last-message-as-read room-id)))
+      (ipc-send 'read-marker room-id (string->symbol evt-id)))))
 
 (safe-environment-set!
   rpc-env 'login
