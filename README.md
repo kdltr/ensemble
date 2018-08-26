@@ -25,17 +25,26 @@ If you grabbed the source from git, build with:
 Run with:
 `./run.sh`
 
+
+If you didn’t use Ensemble before 0.5, you can use the /login command.
+Just type `/login` on the backend window and follow the steps.
+
 You can quit by typing `/exit` or `/quit` at the input prompt.
 
-All configuration and session storage is kept $XDG_CONFIG_HOME/ensemble/ (usually ~/.config/ensemble/)
+All configuration is kept in $XDG_CONFIG_HOME/ensemble/ (usually ~/.config/ensemble/)
+Session storage and cache is kept in $XDG_CACHE_HOME/ensemble/ (usually ~/.cache/ensemble/)
 
 
 Available commands
 ------------------
 
-- `/me text` sends an emote
-- `/room regexp` (or `/r regexp`) room moves you to the room matching the regex
-- `/exit` or `/quit` saves the session to config.scm and quits
+- `/me text` (scope: current window): sends an emote
+- `/say text` (scope: current window): sends text as a message
+- `/list`: lists all windows and their associated room name
+- `/login` (scope: current profile): runs the login prompt
+- `/window win-id` (or `/w win-id`, or `/r win-id`): jumps to the designated window
+- `/rename new-id`: renames the current window to new-id
+- `/exit` or `/quit`: saves the session and exits
 
 
 Available key bindings
@@ -54,8 +63,10 @@ Available key bindings
 - `C-w` removes the word at the left of the cursor
 - `Return` when the input line is empty moves the read marker to the last message
 - `Page Up` and `Page Down` scroll the history of the current room
-- `M-n` switches to the first room of the notification stack
-- `C-n` switches to the last room of the notification stack
+- `C-n` switches to the next window
+- `C-p` switches to the previous window
+- `M-n` switches to the next window with notifications
+- `M-p` switches to the previous window with notifications
 - `Tab` to auto-complete nicknames (only works at the beginning of a message)
 
 
