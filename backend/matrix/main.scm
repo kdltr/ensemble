@@ -253,7 +253,8 @@
   rpc-env 'mark-last-message-as-read
   (lambda (room-id)
     (let ((evt-id (mark-last-message-as-read room-id)))
-      (ipc-send 'read-marker room-id (string->symbol evt-id)))))
+      (ipc-send 'read-marker room-id (string->symbol evt-id))
+      (ipc-send 'notifications room-id 0 0))))
 
 (safe-environment-set!
   rpc-env 'login
