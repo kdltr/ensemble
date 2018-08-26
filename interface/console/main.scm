@@ -329,6 +329,64 @@
   (wbkgdset statuswin (COLOR_PAIR STATUS_PAIR))
   (special-window-write 'ensemble "Loading…"))
 
+;; FIXME less hacky solution
+(define (run-login-prompt)
+  (define (safe-key? p)
+    (member (car p)
+            (list KEY_BACKSPACE
+                  KEY_LEFT #\x02 ;; C-b
+                  KEY_RIGHT #\x06 ;; C-f
+                  KEY_HOME #\x01 ;; C-a
+                  #\x04 ;; C-d
+                  KEY_END #\x05 ;; c-e
+                  #\x0B ;; C-k
+                  #\x0C ;; C-l
+                  #\escape
+                  #(#\escape #\b)
+                  #(#\escape #\f)
+                  #(#\escape #\d)
+                  #\x17 ;; C-w
+                  )))
+  (define (fake-statuswin msg)
+    (lambda ()
+      (werase statuswin)
+      (wattron statuswin STATUS_HIGHLIGHT_ATTRS)
+      (waddstr* statuswin msg)
+      (wattroff statuswin STATUS_HIGHLIGHT_ATTRS)))
+  (define (refresh-hidden-inputwin)
+    (werase inputwin))
+  (define ((newline-input cont))
+    (let ((input input-string))
+      (set! input-string  "")
+      (move-cursor 'left)
+      (cont input)))
+  (define (prompt msg #!key (password #f))
+    (set! refresh-statuswin (fake-statuswin msg))
+    (when password (set! refresh-inputwin refresh-hidden-inputwin))
+    (refresh-statuswin)
+    (refresh-inputwin)
+    (call/cc
+      (lambda (k)
+        (push! (cons #\newline (newline-input k)) keys)
+        (main-loop))))
+
+  (set! input-string "")
+  (move-cursor 'left)
+  (let* ((safe-keys (filter safe-key? keys))
+         (old-keys keys)
+         (old-refresh-inputwin refresh-inputwin)
+         (old-refresh-statuswin refresh-statuswin)
+         ((values) (set! keys safe-keys))
+         (server (prompt "Enter server URL (example: https://matrix.org)"))
+         (username (prompt "Enter username"))
+         (password (prompt "Enter password (not shown)" password: #t)))
+    (set! keys old-keys)
+    (set! refresh-inputwin old-refresh-inputwin)
+    (set! refresh-statuswin old-refresh-statuswin)
+    (refresh-statuswin)
+    (refresh-inputwin)
+    (values server username password)))
+
 (define (waddstr* win str)
   (handle-exceptions exn #t
     (waddstr win str)))
@@ -398,9 +456,7 @@
             (process-execute* +backend-executable+ '("default"))))))
   (thread-start! user-read-loop)
   (thread-start! (lambda () (worker-read-loop worker)))
-  (ipc-send 'connect)
   (let ((joined-rooms (ipc-query 'joined-rooms)))
-    (special-window-write 'ensemble "Rooms joined: ~s" joined-rooms)
     (for-each add-room-window joined-rooms))
   (main-loop))
 

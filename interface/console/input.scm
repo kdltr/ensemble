@@ -121,7 +121,7 @@
   (move-cursor 'right))
 
 (define-key #\tab
-  (unless (equal? input-string "")
+  (unless (or (special-window? *current-window*) (equal? input-string ""))
     (let* ((members-names (ipc-query 'room-members (current-room)))
            (prefix (substring input-string 0 cursor-pos))
            (candidate (find (cut string-prefix-ci? prefix <>) members-names)))
@@ -311,6 +311,10 @@
          window (ipc-query 'room-display-name (window-room window))))
     *room-windows*)
   (special-window-write 'ensemble "end of list"))
+
+(define-command login args
+  (let ((server username password (run-login-prompt)))
+    (ipc-send 'login server username password)))
 
 (define-command (exit quit) args
   (exit))
