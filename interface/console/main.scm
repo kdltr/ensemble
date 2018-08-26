@@ -50,6 +50,7 @@
 
 (define worker)
 (define *user-channel* (gochan 0))
+(define *resize-channel* (gochan 0))
 (define *worker-channel* (gochan 0))
 
 (define (worker-read-loop wrk)
@@ -482,8 +483,10 @@
      (handle-backend-response msg))
     ((*user-channel* -> msg fail)
      (if (eqv? msg 'resize)
-         (resize-terminal)
-         (handle-input msg))))
+         (set! *resize-channel* (gochan-after 25))
+         (handle-input msg)))
+    ((*resize-channel* -> msg fail)
+     (resize-terminal)))
   (main-loop))
 
 (define (get-input)
