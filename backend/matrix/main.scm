@@ -19,6 +19,7 @@
   (chicken pathname)
   (chicken plist)
   (chicken port)
+  (chicken process)
   (chicken process-context)
   (chicken time)
   (chicken time posix)
@@ -89,7 +90,11 @@
       (ssl-make-client-context* verify?: (not (member "--no-ssl-verify"
                                                       args)))))
   (defer 'rpc read)
+  (connect)
   (main-loop))
+
+(define (restart)
+  (process-execute (program-name) (command-line-arguments)))
 
 (define ((make-ssl-server-connector ctx) uri proxy)
   (let ((remote-end (or proxy uri)))
@@ -103,6 +108,7 @@
   (with-input-from-file file-name read-list))
 
 (define (load-profile)
+  (ipc-info "Loading profile")
   (let* ((creds (handle-exceptions exn '()
                   (read-file (make-pathname *profile-dir* "credentials"))))
          (c:server-uri (alist-ref 'server-uri creds))
@@ -113,6 +119,24 @@
     (init! c:server-uri)
     (access-token c:access-token)
     (mxid c:mxid)))
+
+(define (save-profile)
+  (with-output-to-file (make-pathname *profile-dir* "credentials")
+    (lambda ()
+      (write `(server-uri . ,(uri->string (server-uri))))
+      (write `(access-token . ,(access-token)))
+      (write `(mxid . ,(mxid))))))
+
+(define (connect)
+  (handle-exceptions exn
+    (begin
+      (ipc-info "Error: ~a" (exception->string exn))
+      (main-loop))
+    (load-profile))
+  (load-state)
+  (for-each send-notifications (joined-rooms))
+  (ipc-info "Backend started!")
+  (defer 'sync sync since: *next-batch*))
 
 (define (main-loop)
   (let* ((th (receive-defered))
@@ -147,10 +171,7 @@
           (safe-eval quoted-exp environment: rpc-env)))))
 
 (define (exception->string exn)
-  (with-output-to-string
-    (lambda ()
-      (print-error-message exn (current-output-port) "Backend error"))))
-
+  (get-condition-property exn 'exn 'message))
 
 
 ;; IPC definitions
@@ -182,15 +203,6 @@
           *delayed-responses*)))
 
 ;; ASYNC IPC calls
-
-(safe-environment-set!
-  rpc-env 'connect
-  (lambda ()
-    (load-profile)
-    (load-state)
-    (ipc-info "Connecting…")
-    (for-each send-notifications (joined-rooms))
-    (defer 'sync sync since: *next-batch*)))
 
 (safe-environment-set!
   rpc-env 'subscribe
@@ -241,6 +253,17 @@
   rpc-env 'mark-last-message-as-read
   (lambda (id)
     (mark-last-message-as-read id)))
+
+(safe-environment-set!
+  rpc-env 'login
+  (lambda (server username password)
+    (delete-file* (make-pathname *profile-dir* "credentials"))
+    (delete-file* *state-file*)
+    (init! server)
+    (password-login username password)
+    (ipc-info "Login successful")
+    (save-profile)
+    (restart)))
 
 
 ;; Synchronous IPC calls

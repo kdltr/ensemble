@@ -76,18 +76,25 @@
   (info "Done saving state"))
 
 (define (load-state)
+  (ipc-info "Loading profile cache")
   (define (load exp)
     (case (car exp)
       ((room)
        (set! (symbol-plist (cadr exp))
          (caddr exp))
        (push! (cadr exp) *rooms*))
-      ((next-batch) (set! *next-batch* (cadr exp)))))
+      ((next-batch) (set! *next-batch* (cadr exp)))
+      (else (error "Unknown state element" exp))))
 
-  (when (file-exists? *state-file*)
-    (with-input-from-file *state-file*
-      (lambda ()
-        (port-for-each load read)))))
+  (handle-exceptions exn
+    (begin
+      (ipc-info "Profile cache is corrupted, restarting")
+      (delete-file *state-file*)
+      (restart))
+    (when (file-exists? *state-file*)
+      (with-input-from-file *state-file*
+        (lambda ()
+          (port-for-each load read))))))
 
 
 
