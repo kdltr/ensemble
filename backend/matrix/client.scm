@@ -307,7 +307,7 @@
                            (lambda (id+reads)
                              (when (member (string-downcase (mxid))
                                            (map (o string-downcase symbol->string car)
-                                             (mref '(m.read) (cdr id+reads))))
+                                             (or (mref '(m.read) (cdr id+reads)) '())))
                                (info "[marker] id+reads: ~s~%" id+reads)
                                (read-marker-set! room-id (car id+reads))
                                (when (get room-id 'frontend-subscribed)
