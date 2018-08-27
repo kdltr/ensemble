@@ -18,8 +18,10 @@
           (error "Either the XDG_CACHE_HOME or the HOME environment variable must be defined"))))
 
 (define (config-home)
-  (make-pathname (xdg-config-home) "ensemble"))
+  (or (get-environment-variable "ENSEMBLE_CONFIG_HOME")
+      (make-pathname (xdg-config-home) "ensemble")))
 
 (define (cache-home)
-  (make-pathname (xdg-cache-home) "ensemble"))
+  (or (get-environment-variable "ENSEMBLE_CACHE_HOME")
+      (make-pathname (xdg-cache-home) "ensemble")))
 ) ;; locations module

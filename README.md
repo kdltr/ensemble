@@ -31,8 +31,8 @@ Just type `/login` on the backend window and follow the steps.
 
 You can quit by typing `/exit` or `/quit` at the input prompt.
 
-All configuration is kept in $XDG_CONFIG_HOME/ensemble/ (usually ~/.config/ensemble/)
-Session storage and cache is kept in $XDG_CACHE_HOME/ensemble/ (usually ~/.cache/ensemble/)
+All configuration is kept in $ENSEMBLE_CONFIG_HOME if defined, or $XDG_CONFIG_HOME/ensemble/ (usually ~/.config/ensemble/)
+Session storage and cache is kept in $ENSEMBLE_CACHE_HOME if defined, or $XDG_CACHE_HOME/ensemble/ (usually ~/.cache/ensemble/)
 
 
 Available commands
