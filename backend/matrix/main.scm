@@ -221,20 +221,14 @@
 (safe-environment-set!
   rpc-env 'fetch-events
   (lambda (room-id limit offset)
-    (let* ((tl (room-timeline room-id limit: limit offset: offset))
-           (holes (filter hole-event? tl)))
-      (for-each
-        (lambda (hole)
-          ;; TODO hide this state manipulation in request-hole-messages
-          (unless (member hole *requested-holes*)
-            (push! hole *requested-holes*)
-            (defer 'hole-messages request-hole-messages room-id hole limit)))
-        holes)
+    (let* ((tl (room-timeline room-id limit: limit offset: offset)))
       (ipc-send 'bundle-start)
       (ipc-send 'clear room-id)
       (ipc-send 'room-name room-id (room-display-name room-id))
       (for-each
         (lambda (m)
+          (when (hole-event? m)
+            (request-hole-messages room-id m limit))
           (ipc-send 'message room-id (cleanup-event m)))
         (reverse tl))
       (ipc-send 'bundle-end))))

@@ -351,6 +351,8 @@
       (when (get room-id 'frontend-subscribed)
         (for-each
           (lambda (m)
+            (when (hole-event? m)
+              (request-hole-messages room-id m 10))
             (ipc-send 'message room-id (cleanup-event m)))
           (reverse timeline-additions))))
 
@@ -412,8 +414,12 @@
   (take-while (lambda (o) (not (equal? ref-evt o))) evts))
 
 (define (request-hole-messages room-id hole-evt limit)
-  (let* ((msgs (room-messages room-id
-                              from: (mref '(content from) hole-evt)
-                              limit: limit
-                              dir: 'b)))
-    (list room-id hole-evt msgs)))
+  (define (defered)
+    (let* ((msgs (room-messages room-id
+                                from: (mref '(content from) hole-evt)
+                                limit: limit
+                                dir: 'b)))
+      (list room-id hole-evt msgs)))
+  (unless (member hole-evt *requested-holes*)
+    (push! hole-evt *requested-holes*)
+    (defer 'hole-messages defered)))
