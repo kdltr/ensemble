@@ -266,25 +266,29 @@
 (define (handle-command str)
   (let* ((cmdline (string-split (string-drop str 1) " "))
          (cmd (string->symbol (car cmdline)))
+         (args-index (string-index str #\space))
+         (joined-args (substring str (if args-index
+                                         (add1 args-index)
+                                         (string-length str))))
          (args (cdr cmdline))
-         (proc (alist-ref cmd commands)))
+         (proc (alist-ref cmd *commands*)))
     (if proc
-        (proc args)
-        #;(status-message (format #f "Unknown command: ~a" cmd)))))
+        (proc joined-args args)
+        (special-window-write 'ensemble "Unknown command: ~a" cmd))))
 
-(define commands '())
+(define *commands* '())
 (define-syntax define-command
   (syntax-rules ()
-    ((_ (sym ...) arg . body) (let ((proc (lambda (arg) . body)))
-                                (push! (cons 'sym proc) commands)
+    ((_ (sym ...) joined args . body) (let ((proc (lambda (joined args) . body)))
+                                        (push! (cons 'sym proc) *commands*)
                                 ...))
-    ((_ sym arg . body) (define-command (sym) arg . body))))
+    ((_ sym joined args . body) (define-command (sym) joined args . body))))
 
-(define-command (window w r) args
-  (switch-window (string->symbol (string-downcase (string-join args)))))
+(define-command (window w r) joined args
+  (switch-window (string->symbol (string-downcase joined))))
 
-(define-command rename args
-  (let ((target (string->symbol (string-join args " "))))
+(define-command rename joined args
+  (let ((target (string->symbol joined)))
     (cond ((null? args)
            (special-window-write 'ensemble
                                  "usage: /rename NEW-NAME"))
@@ -295,14 +299,14 @@
            (else
              (rename-window *current-window* target)))))
 
-(define-command say args
+(define-command say joined args
   (when (room-window? *current-window*)
-    (ipc-send 'message:text (current-room) (string-join args " "))))
+    (ipc-send 'message:text (current-room) joined)))
 
-(define-command me args
-  (ipc-send 'message:emote (current-room) (string-join args " ")))
+(define-command me joined args
+  (ipc-send 'message:emote (current-room) joined))
 
-(define-command list args
+(define-command list joined args
   (special-window-write 'ensemble "beginning of list")
   (for-each
     (lambda (window)
@@ -312,15 +316,14 @@
     *room-windows*)
   (special-window-write 'ensemble "end of list"))
 
-(define-command (find f) args
-  (let* ((str (string-join args " "))
-         (matching-rooms (ipc-query 'find-room str)))
+(define-command (find f) joined args
+  (let ((matching-rooms (ipc-query 'find-room joined)))
     (cond ((null? matching-rooms))
           ((null? (cdr matching-rooms))
            (switch-window (window-for-room (car matching-rooms))))
           (else
             (switch-window 'ensemble)
-            (special-window-write 'ensemble "Rooms matching '~a'" str)
+            (special-window-write 'ensemble "Rooms matching '~a'" joined)
             (for-each
               (lambda (room-id)
                 (special-window-write
@@ -329,9 +332,9 @@
               matching-rooms)
             (special-window-write 'ensemble "end of /find results")))))
 
-(define-command login args
+(define-command login joined args
   (let ((server username password (run-login-prompt)))
     (ipc-send 'login server username password)))
 
-(define-command (exit quit) args
+(define-command (exit quit) joined args
   (exit))
