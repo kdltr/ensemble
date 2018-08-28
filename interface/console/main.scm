@@ -4,7 +4,6 @@
 ;; TODO (code quality) exceptions that write messages to the “ensemble” windows
 ;; TODO title bar for room name and topic
 ;; TODO dynamic status bar (scrolling, outside highlight indicators)
-;; TODO restore terminal beep
 
 (module (ensemble interface console) (run)
 (import
@@ -520,9 +519,14 @@
            handle-backend-response
            (collect-bundle-messages)))
         ((notifications)
-         (let ((window (add-room-window (cadr msg))))
-           (put! window 'highlights (caddr msg))
-           (put! window 'notifications (cadddr msg))
+         (let* ((window (add-room-window (cadr msg)))
+                (old-hls _ (window-notifications window))
+                (new-hls (caddr msg))
+                (new-notifs (cadddr msg)))
+           (when (> new-hls old-hls)
+             (beep))
+           (put! window 'highlights new-hls)
+           (put! window 'notifications new-notifs)
            (refresh-statuswin)))
         ((clear)
          (when (equal? (cadr msg) (current-room))
