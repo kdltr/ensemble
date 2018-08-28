@@ -1,5 +1,5 @@
 ;; TODO Better error reporting and recovery
-;; TODO Environment variables for config and cache/state directories
+;; TODO get rid of client.scm, take care of details in IPC procedures
 ;; TODO Show the result of message sending immediately
 ;; TODO Make a queue of messages to send, to avoid reordering
 ;; TODO profile locking to avoid multiple instances using the same profiles

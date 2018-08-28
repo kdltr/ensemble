@@ -1,5 +1,4 @@
-credentials
-state
-lock
 *.log
-repo
+repo/
+config/
+cache/

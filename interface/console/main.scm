@@ -1,3 +1,11 @@
+;; TODO “markup” for events
+;; TODO better history navigation
+;; TODO support for multiple profiles/backends
+;; TODO (code quality) exceptions that write messages to the “ensemble” windows
+;; TODO title bar for room name and topic
+;; TODO dynamic status bar (scrolling, outside highlight indicators)
+;; TODO restore terminal beep
+
 (module (ensemble interface console) (run)
 (import
   scheme
@@ -29,13 +37,6 @@
   (ensemble libs concurrency)
   (ensemble libs debug)
   (ensemble libs locations))
-
-;; TODO “markup” for events
-;; TODO better history navigation
-;; TODO support for multiple profiles/backends
-;; TODO (code quality) exceptions that write messages to the “ensemble” windows
-;; TODO title bar for room name and topic
-;; TODO dynamic sizing of the status bar
 
 (include-relative "input.scm")
 
