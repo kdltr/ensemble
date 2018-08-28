@@ -6,10 +6,10 @@
   (chicken foreign)
   (chicken format)
   ncurses
+  (ensemble libs bindings)
   (ensemble interface console))
 
-(foreign-declare "#include <locale.h>")
-(foreign-code "setlocale(LC_ALL, \"C.UTF-8\");")
+(setlocale "C.UTF-8")
 
 (handle-exceptions exn
   (begin

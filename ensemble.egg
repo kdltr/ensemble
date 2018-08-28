@@ -61,5 +61,6 @@
                 ensemble.libs.concurrency))
    (program ensemble
             (component-dependencies
+              ensemble.libs.bindings
               ensemble.interface.console))
    ))
