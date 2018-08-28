@@ -1,7 +1,6 @@
 ;; TODO Better error reporting and recovery
 ;; TODO Show the result of message sending immediately
 ;; TODO Make a queue of messages to send, to avoid reordering
-;; TODO profile locking to avoid multiple instances using the same profiles
 ;; TODO send a room-name message when a room name change event is received
 
 (module (ensemble backend matrix) (run)
@@ -37,10 +36,11 @@
   rest-bind
   (prefix http-client #:http)
   sandbox
+  (ensemble libs bindings)
   (ensemble libs concurrency)
   (ensemble libs debug)
-  (ensemble libs locations)
   (ensemble libs json-help)
+  (ensemble libs locations)
   (ensemble libs nonblocking-ports))
 
 (define *lock-fd*)
@@ -70,7 +70,7 @@
                               (bitwise-ior perm/irusr perm/iwusr)))
   (handle-exceptions exn
     (error "This profile is already in use")
-    (file-lock (open-output-file* *lock-fd*)))
+    (flock *lock-fd*))
   (let ((err-port (open-output-file (make-pathname *profile-dir* "backend.log")))
         (in-port (open-input-file*/nonblocking 0))
         (out-port (open-output-file*/nonblocking 1)))

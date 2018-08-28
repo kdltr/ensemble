@@ -30,6 +30,8 @@
               (source "libs/nonblocking-ports.scm"))
    (extension ensemble.libs.json-help
               (source "libs/json-help.scm"))
+   (extension ensemble.libs.bindings
+              (source "libs/bindings.scm"))
    (extension ensemble.libs.concurrency
               (source "libs/concurrency.scm")
               (component-dependencies
@@ -42,6 +44,7 @@
               ensemble.libs.debug
               ensemble.libs.locations
               ensemble.libs.json-help
+              ensemble.libs.bindings
               ensemble.libs.nonblocking-ports
               ensemble.libs.concurrency)
             (source-dependencies
