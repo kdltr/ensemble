@@ -1,6 +1,10 @@
 ;; Utilities
 ;; =========
 
+(define (room-mark-read room evt)
+  (defer 'receipt
+    room-receipt room 'm.read evt '()))
+
 (define (mark-last-message-as-read room-id)
   (let* ((tl (room-timeline room-id limit: 1))
          (last-evt (if (pair? tl) (car tl) '()))
@@ -30,6 +34,18 @@
         (values (cdr before) (reverse after))
         (loop (cdr before) (cons (car before) after)))))
 
+(define new-transaction-id
+  (let ((cnt 0))
+    (lambda ()
+      (set! cnt (add1 cnt))
+      (sprintf "~a-~a" (current-seconds) cnt))))
+
+(define (password-login user password)
+  (let ((res (login `((type . "m.login.password")
+                      (user . ,user)
+                      (password . ,password)))))
+    (mxid (alist-ref 'user_id res))
+    (access-token (alist-ref 'access_token res))))
 
 
 ;; DB replacement

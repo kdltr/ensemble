@@ -28,6 +28,8 @@
               (source "libs/locations.scm"))
    (extension ensemble.libs.nonblocking-ports
               (source "libs/nonblocking-ports.scm"))
+   (extension ensemble.libs.json-help
+              (source "libs/json-help.scm"))
    (extension ensemble.libs.concurrency
               (source "libs/concurrency.scm")
               (component-dependencies
@@ -39,11 +41,11 @@
             (component-dependencies
               ensemble.libs.debug
               ensemble.libs.locations
+              ensemble.libs.json-help
               ensemble.libs.nonblocking-ports
               ensemble.libs.concurrency)
             (source-dependencies
               "backend/matrix/low-level.scm"
-              "backend/matrix/matrix.scm"
               "backend/matrix/client.scm"))
    ;; Console interface
    (extension ensemble.interface.console

@@ -1,5 +1,4 @@
 ;; TODO Better error reporting and recovery
-;; TODO get rid of client.scm, take care of details in IPC procedures
 ;; TODO Show the result of message sending immediately
 ;; TODO Make a queue of messages to send, to avoid reordering
 ;; TODO profile locking to avoid multiple instances using the same profiles
@@ -41,6 +40,7 @@
   (ensemble libs concurrency)
   (ensemble libs debug)
   (ensemble libs locations)
+  (ensemble libs json-help)
   (ensemble libs nonblocking-ports))
 
 (define *lock-fd*)
@@ -54,7 +54,7 @@
                                        mutable: #f
                                        extendable: #f))
 
-(include-relative "matrix.scm")
+(include-relative "low-level.scm")
 (include-relative "client.scm")
 
 (define (run . args)
@@ -236,12 +236,20 @@
 (safe-environment-set!
   rpc-env 'message:text
   (lambda (room-id str)
-    (message:text room-id str)))
+    (let ((transaction-id (new-transaction-id)))
+      (defer 'message room-send
+             room-id 'm.room.message transaction-id
+             `((msgtype . "m.text")
+               (body . ,str))))))
 
 (safe-environment-set!
   rpc-env 'message:emote
   (lambda (room-id str)
-    (message:emote room-id str)))
+    (let ((transaction-id (new-transaction-id)))
+      (defer 'message room-send
+             room-id 'm.room.message transaction-id
+             `((msgtype . "m.emote")
+               (body . ,str))))))
 
 (safe-environment-set!
   rpc-env 'mark-last-message-as-read

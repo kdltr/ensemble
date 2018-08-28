@@ -28,6 +28,7 @@
 ;; The real scheme, host and port will be rewritten when doing the actual requests
 (define api-uri (uri-reference "http://PLACEHOLDER/_matrix/client/r0"))
 
+(define mxid (make-parameter #f))
 (define server-uri (make-parameter #f))
 (define access-token (make-parameter #f))
 
