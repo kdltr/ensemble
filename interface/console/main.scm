@@ -4,8 +4,6 @@
 ;; TODO (code quality) exceptions that write messages to the “ensemble” windows
 ;; TODO title bar for room name and topic
 ;; TODO dynamic status bar (scrolling, outside highlight indicators)
-;; TODO /find command, a bit like the previous /r command but multiple matches are
-;;      listed in the ensemble window like /list
 
 (module (ensemble interface console) (run)
 (import

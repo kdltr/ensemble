@@ -312,6 +312,23 @@
     *room-windows*)
   (special-window-write 'ensemble "end of list"))
 
+(define-command (find f) args
+  (let* ((str (string-join args " "))
+         (matching-rooms (ipc-query 'find-room str)))
+    (cond ((null? matching-rooms))
+          ((null? (cdr matching-rooms))
+           (switch-window (window-for-room (car matching-rooms))))
+          (else
+            (switch-window 'ensemble)
+            (special-window-write 'ensemble "Rooms matching '~a'" str)
+            (for-each
+              (lambda (room-id)
+                (special-window-write
+                  'ensemble "~a: ~a"
+                  (window-for-room room-id) (ipc-query 'room-display-name room-id)))
+              matching-rooms)
+            (special-window-write 'ensemble "end of /find results")))))
+
 (define-command login args
   (let ((server username password (run-login-prompt)))
     (ipc-send 'login server username password)))

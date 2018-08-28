@@ -41,6 +41,7 @@ Available commands
 - `/me text` (scope: current window): sends an emote
 - `/say text` (scope: current window): sends text as a message
 - `/list`: lists all windows and their associated room name
+- `/find regex`: jumps to the window where the room matches regex, or to a listing of matching rooms
 - `/login` (scope: current profile): runs the login prompt
 - `/window win-id` (or `/w win-id`, or `/r win-id`): jumps to the designated window
 - `/rename new-id`: renames the current window to new-id
