@@ -224,7 +224,8 @@
     (let* ((tl (room-timeline room-id limit: limit offset: offset)))
       (ipc-send 'bundle-start)
       (ipc-send 'clear room-id)
-      (ipc-send 'room-name room-id (room-display-name room-id))
+      (ipc-send 'room-name room-id (or (room-display-name (room-context room-id))
+                                       (symbol->string room-id)))
       (for-each
         (lambda (m)
           (when (hole-event? m)
@@ -269,6 +270,17 @@
     (save-profile)
     (restart)))
 
+(safe-environment-set!
+  rpc-env 'join-room
+  (lambda (room)
+    (set! *rooms-invited* (alist-delete! room *rooms-invited*))
+    (defer 'join-room alias-join room '())))
+
+(safe-environment-set!
+  rpc-env 'leave-room
+  (lambda (room-id)
+    (defer 'leave-room room-leave room-id '())))
+
 
 ;; Synchronous IPC calls
 
@@ -282,7 +294,7 @@
                   ((find-room) find-room)
                   ((joined-rooms) joined-rooms)
                   ((room-members) query-room-members)
-                  ((room-display-name) room-display-name)
+                  ((room-display-name) query-room-display-name)
                   ((read-marker) read-marker)
                   (else oops))))
       (delay-response
@@ -322,6 +334,10 @@
         (or (json-true? (mref '(displayname) m))
             (caar m)))
       members)))
+
+(define (query-room-display-name id)
+  (or (room-display-name (room-context id))
+      (symbol->string id)))
 
 (define (read-marker id)
   (let ((marker (read-marker-ref id)))

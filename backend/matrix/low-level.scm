@@ -82,7 +82,9 @@
 
 (define-endpoint GET (sync "sync" #!key filter since timeout full_state set_presence timeout))
 
+(define-endpoint POST (alias-join "join" room-id-or-alias))
 (define-endpoint POST (room-join "rooms" room-id "join"))
+(define-endpoint POST (room-leave "rooms" room-id "leave"))
 (define-endpoint PUT (room-send "rooms" room-id "send" event-type transaction-id))
 (define-endpoint GET (room-messages "rooms" room-id "messages" #!key from to dir limit))
 (define-endpoint POST (room-receipt "rooms" room-id "receipt" receipt-type event-id))

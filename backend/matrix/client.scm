@@ -13,19 +13,17 @@
       (room-mark-read room-id evt-id)
       evt-id)))
 
-(define (room-display-name id)
-  (let ((ctx (and id (room-context id))))
-    (or (and (not ctx) "")
-        (room-name ctx)
-        (json-true? (mref '(("" . m.room.canonical_alias) alias) ctx))
-        (and-let* ((v (json-true? (mref '(("" . m.room.aliases) aliases) ctx))))
-             (vector-ref v 0))
-        (and-let* ((members (room-members ctx))
-                   (check (= (length members) 2))
-                   (others (remove (lambda (p) (equal? (caar p) (string-downcase (mxid)))) members)))
-             (or (member-displayname (caaar others) ctx)
-                 (caaar others)))
-        (symbol->string id))))
+(define (room-display-name ctx)
+  (or (and (not ctx) "")
+      (room-name ctx)
+      (json-true? (mref '(("" . m.room.canonical_alias) alias) ctx))
+      (and-let* ((v (json-true? (mref '(("" . m.room.aliases) aliases) ctx))))
+           (vector-ref v 0))
+      (and-let* ((members (room-members ctx))
+                 (check (= (length members) 2))
+                 (others (remove (lambda (p) (equal? (caar p) (string-downcase (mxid)))) members)))
+           (or (member-displayname (caaar others) ctx)
+               (caaar others)))))
 
 (define (split-timeline tl evt)
   (let loop ((before tl)
@@ -89,6 +87,12 @@
           (write `(room ,r ,(symbol-plist r)))
           (newline))
         *rooms*)
+      (for-each
+        (lambda (inv)
+          (info "Saving invitation: ~s" inv)
+          (write `(invitation ,(car inv) ,(cdr inv)))
+          (newline))
+        *rooms-invited*)
       (write `(next-batch ,*next-batch*))))
   (info "Done saving state"))
 
@@ -101,6 +105,7 @@
          (caddr exp))
        (push! (cadr exp) *rooms*))
       ((next-batch) (set! *next-batch* (cadr exp)))
+      ((invitation) (send-invitation-notice (cadr exp) (caddr exp)))
       (else (error "Unknown state element" exp))))
 
   (handle-exceptions exn
@@ -335,7 +340,8 @@
 (define (handle-sync batch)
   (let ((next (mref '(next_batch) batch)))
     (info "[~A] update: ~a~%" (seconds->string) next)
-    (for-each advance-room (mref '(rooms join) batch))
+    (for-each advance-room (or (mref '(rooms join) batch) '()))
+    (for-each register-invitation (or (mref '(rooms invite) batch) '()))
     (set! *next-batch* next)
     next))
 
@@ -353,6 +359,8 @@
          (old-timeline (room-timeline room-id)))
     (unless (room-exists? room-id)
       (initialize-room! room-id state))
+    (set! *rooms-invited*
+      (alist-delete! room-id *rooms-invited*))
     (receive (timeline-additions new-state)
       ((compose ;; Timeline events
                 (advance-timeline events)
@@ -384,6 +392,20 @@
             (inexact->exact (round (or (get room-id 'highlights) 0)))
             (inexact->exact (round (or (get room-id 'notifications) 0)))))
 
+(define *rooms-invited* '())
+(define (register-invitation id+invited-room)
+  (let* ((room-id (car id+invited-room))
+         (state-events (or (mref '(invite_state events) (cdr id+invited-room))
+                           '()))
+         (state (initial-context state-events))
+         (name (or (room-display-name state)
+                   (symbol->string room-id))))
+    (send-invitation-notice room-id name)))
+
+(define (send-invitation-notice room-id name)
+  (push! (cons room-id name) *rooms-invited*)
+  (ipc-info "You have been invited to: ~a" name)
+  (ipc-info "You can accept the invitation by typing `/join ~a` or reject it by typing `/leave ~a" room-id room-id))
 
 
 ;; Holes management

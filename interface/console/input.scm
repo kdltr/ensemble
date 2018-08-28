@@ -336,5 +336,13 @@
   (let ((server username password (run-login-prompt)))
     (ipc-send 'login server username password)))
 
+(define-command join joined args
+  (ipc-send 'join-room joined))
+
+(define-command leave joined args
+  (if (null? args)
+      (ipc-send 'leave-room (window-room *current-window*))
+      (ipc-send 'leave-room joined)))
+
 (define-command (exit quit) joined args
   (exit))
