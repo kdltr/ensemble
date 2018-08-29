@@ -2,6 +2,7 @@
 ;; TODO Show the result of message sending immediately
 ;; TODO Make a queue of messages to send, to avoid reordering
 ;; TODO send a room-name message when a room name change event is received
+;; TODO add unit tests, especially for state updating and event printing procedures
 
 (module (ensemble backend matrix) (run)
 (import

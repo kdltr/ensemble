@@ -132,7 +132,7 @@
   (if (mref '(state_key) evt)
       (let ((key (cons (state-key evt)
                        (string->symbol (mref '(type) evt))))
-            (content (mref (if reverse '(prev_content) '(content))
+            (content (mref (if reverse '(unsigned prev_content) '(content))
                            evt)))
         (if (or (ignored-state-event? evt)
                 (json-false? content))
@@ -199,8 +199,6 @@
         (sprintf "<~a> [redacted]" name))
         ))
 
-;; TODO fix this mess up
-;; TODO membership may be ban, leave… in the context
 (define (m.room.member-printer evt ctx)
   (let* ((sender (mref '(sender) evt))
          (sender-name (or (member-displayname sender ctx)
@@ -222,9 +220,11 @@
       ((knock)
        (sprintf "*** ~A knocked" displayed-name))
       ((join)
-       (if (equal? "join" (mref `((,who . m.room.member) membership) ctx))
-           (let* ((old-name (member-displayname who ctx))
-                  (old-avatar (member-avatar who ctx))
+       (if (equal? "join" (mref '(unsigned prev_content membership) evt))
+           (let* ((old-name (json-true? (mref '(unsigned prev_content displayname)
+                                              evt)))
+                  (old-avatar (json-true? (mref '(unsigned prev_content avatar_url)
+                                                evt)))
                   (same-name (equal? old-name maybe-name))
                   (same-avatar (equal? old-avatar maybe-avatar)))
              (cond ((and (not same-name) (not same-avatar))
@@ -240,7 +240,10 @@
                              displayed-name (if maybe-avatar
                                                 (mxc->url maybe-avatar)
                                                 "nothing")))
-                   (else "")))
+                   ;; TODO just discard the event
+                   (else
+                     (sprintf "*** ~A joined but was already there"
+                              displayed-name))))
            (sprintf "*** ~A joined the room" displayed-name))))))
 
 (define (com.upyum.ensemble.hole-printer evt ctx)
