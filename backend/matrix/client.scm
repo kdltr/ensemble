@@ -270,10 +270,7 @@
                    "unknown")))
     (sprintf "[~a] ~a~%" time
              (if str
-                 (if (or (eq? (void) str) (equal? "" str))
-                     "" ;; FIXME
-                     #;(sprintf "### BUG in printer for ~a~%EVT: ~s~%CTX: ~s" type evt ctx)
-                     str)
+                 str
                  (sprintf "No event printer for ~a: ~s" type content)))))
 
 (define (cleanup-event evt)
