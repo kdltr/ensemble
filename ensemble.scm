@@ -6,10 +6,7 @@
   (chicken foreign)
   (chicken format)
   ncurses
-  (ensemble libs bindings)
   (ensemble interface console))
-
-(setlocale "C.UTF-8")
 
 (handle-exceptions exn
   (begin

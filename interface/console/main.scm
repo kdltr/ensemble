@@ -33,6 +33,7 @@
   ioctl
   ncurses
   miscmacros
+  (ensemble libs bindings)
   (ensemble libs concurrency)
   (ensemble libs debug)
   (ensemble libs locations))
@@ -42,6 +43,7 @@
 (define +backend-executable+ "ensemble.backend.matrix")
 
 (define tty-fileno 0)
+(define *locale* "")
 (define rows)
 (define cols)
 (define inputwin)
@@ -315,6 +317,7 @@
 
 (define (start-interface)
   ;; Make ncurses wait less time when receiving an ESC character
+  (set! *locale* (setlocale ""))
   (set-environment-variable! "ESCDELAY" "20")
   (initscr)
   (noecho)
@@ -444,6 +447,9 @@
     (lambda (_) (reset)))
   (cond-expand (debug (info-port (open-output-file "frontend.log"))) (else))
   (start-interface)
+  (unless (string-contains *locale* "UTF-8")
+    (special-window-write 'ensemble
+      "Warning: you don't seem to be using an UTF-8 locale"))
   (special-window-write 'ensemble "Loading config…")
   (load-config)
   (on-exit save-config)
