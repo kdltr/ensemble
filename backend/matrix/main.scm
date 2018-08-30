@@ -3,6 +3,7 @@
 ;; TODO Make a queue of messages to send, to avoid reordering
 ;; TODO send a room-name message when a room name change event is received
 ;; TODO add unit tests, especially for state updating and event printing procedures
+;; TODO IPC for room leaving
 
 (module (ensemble backend matrix) (run)
 (import
@@ -24,6 +25,7 @@
   (chicken time posix)
   miscmacros
   srfi-1
+  srfi-18
   srfi-71
   utf8
   utf8-srfi-13
@@ -151,6 +153,42 @@
   (flush-delayed-responses)
   (main-loop))
 
+(define (thread-join-protected! thread)
+  (define (defered-id-name exn)
+    (->string (get-condition-property exn 'defered 'id)))
+  (define (do-retry exn)
+    (ipc-info "Retrying in ~a seconds"
+              (get-condition-property exn 'defered 'waiting-time 0))
+    (retry exn))
+  (receive data (handle-exceptions exn exn (thread-join! thread))
+    (if (uncaught-exception? (car data))
+        (condition-case (signal (uncaught-exception-reason (car data)))
+          (exn (exn i/o net)
+            (ipc-info "Network error (in ~a): ~a"
+                      (defered-id-name exn)
+                      (exception->string exn))
+            (do-retry exn)
+            (values 'no-one #f))
+          (exn (exn http server-error)
+            (ipc-info "Server error (in ~a): ~a"
+                      (defered-id-name exn)
+                      (exception->string exn))
+            (do-retry exn)
+            (values 'no-one #f))
+          (exn (exn http client-error)
+            (ipc-info "Client error (in ~a): ~a"
+                      (defered-id-name exn)
+                      (exception->string exn))
+            (values 'no-one #f))
+          (exn (exn http premature-disconnection)
+            (ipc-info "Premature disconnection (in ~a): ~a"
+                      (defered-id-name exn)
+                      (exception->string exn))
+            (do-retry exn)
+            (values 'no-one #f)))
+        (apply values data))))
+
+
 (define +delayed-reply-marker+ (gensym 'delayed-reply))
 (define +error-marker+ (gensym 'error))
 
@@ -172,7 +210,7 @@
           (safe-eval quoted-exp environment: rpc-env)))))
 
 (define (exception->string exn)
-  (get-condition-property exn 'exn 'message))
+  (get-condition-property exn 'exn 'message ""))
 
 
 ;; IPC definitions

@@ -1,5 +1,4 @@
 (module (ensemble libs concurrency) (defer receive-defered retry
-                                     thread-join-protected!
                                      start-worker worker-wait
                                      worker-receive worker-send
                                      worker-name)
@@ -37,27 +36,30 @@
   (gochan-recv ui-chan))
 
 ;; Retry a failed defered procedure
+(define +wait-scaling-factor+ (/ (+ 1. (sqrt 5.)) 2.)) ;; Phi
 (define (retry exn)
   (let ((id (get-condition-property exn 'defered 'id #f))
         (proc (get-condition-property exn 'defered 'proc #f))
-        (args (get-condition-property exn 'defered 'args #f)))
+        (args (get-condition-property exn 'defered 'args #f))
+        (waiting-time (get-condition-property exn 'defered 'waiting-time 0)))
     (if (and id proc args)
         (begin
           (info "[retry] retrying ~a~%" exn)
-          (defer id (lambda (args) (thread-sleep! 1) (apply proc args)) args))
+          (defer id (lambda (args)
+                      (thread-sleep! waiting-time)
+                      (handle-exceptions exn
+                        (signal
+                          (make-composite-condition
+                            (make-property-condition 'defered
+                              'waiting-time (min 5
+                                                 (if (zero? waiting-time)
+                                                     +wait-scaling-factor+
+                                                     (* +wait-scaling-factor+
+                                                        waiting-time))))
+                            exn))
+                        (apply proc args)))
+                 args))
         (info "[retry] failed to retry: ~a~%" exn))))
-
-(define (thread-join-protected! thread)
-  (receive data (handle-exceptions exn exn (thread-join! thread))
-    (if (uncaught-exception? (car data))
-        (condition-case (signal (uncaught-exception-reason (car data)))
-          (exn (exn i/o net)  (retry exn) (values 'no-one #f))
-          (exn (exn http server-error)  (retry exn) (values 'no-one #f))
-          (exn (exn http premature-disconnection)
-            (retry exn)
-            (values 'no-one #f)))
-        (apply values data))))
-
 
 
 ;; Worker processes

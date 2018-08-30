@@ -4,6 +4,7 @@
 ;; TODO (code quality) exceptions that write messages to the “ensemble” windows
 ;; TODO title bar for room name and topic
 ;; TODO dynamic status bar (scrolling, outside highlight indicators)
+;; TODO remove windows for left rooms
 
 (module (ensemble interface console) (run)
 (import
