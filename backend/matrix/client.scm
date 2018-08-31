@@ -298,6 +298,7 @@
                (new-state (update-context state evt))
                (evt-id (mref '(event_id) evt))
                (formated (print-event evt state))
+               (transaction-id (json-true? (mref '(unsigned transaction_id) evt)))
                (my-name (or (member-displayname (mxid) state)
                             (mxid)))
                (highlight? (and (not (equal? (mref '(sender) evt)
@@ -307,6 +308,8 @@
                (fmt-evt `((event_id . ,evt-id)
                           (formated . ,formated)
                           ,@(if highlight? '((highlight . #t)) '()))))
+          (when transaction-id
+            (remove-temporary-message! transaction-id))
           (loop (add1 i)
                 (cons fmt-evt timeline)
                 new-state)))))

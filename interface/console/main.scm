@@ -299,6 +299,7 @@
 (define STATUS_HIGHLIGHT_PAIR 2)
 (define STATUS_LOWLIGHT_PAIR 3)
 (define MESSAGE_HIGHLIGHT_PAIR 4)
+(define MESSAGE_LOWLIGHT_PAIR 5)
 (define STATUS_LOWLIGHT_ATTRS)
 (define STATUS_HIGHLIGHT_ATTRS)
 (define STATUS_NORMAL_ATTRS)
@@ -309,6 +310,7 @@
   (init_pair STATUS_HIGHLIGHT_PAIR COLOR_BLUE COLOR_WHITE)
   (init_pair STATUS_LOWLIGHT_PAIR 8 COLOR_WHITE)
   (init_pair MESSAGE_HIGHLIGHT_PAIR COLOR_CYAN COLOR_BLACK)
+  (init_pair MESSAGE_LOWLIGHT_PAIR 8 COLOR_BLACK)
   (set! STATUS_LOWLIGHT_ATTRS
     (COLOR_PAIR STATUS_LOWLIGHT_PAIR))
   (set! STATUS_HIGHLIGHT_ATTRS
@@ -556,6 +558,8 @@
            (maybe-newline)
            (when (alist-ref 'highlight (caddr msg))
              (wcolor_set messageswin MESSAGE_HIGHLIGHT_PAIR #f))
+           (when (alist-ref 'lowlight (caddr msg))
+             (wcolor_set messageswin MESSAGE_LOWLIGHT_PAIR #f))
            (wprintw messageswin "~A"
                     (alist-ref 'formated (caddr msg)))
            (wcolor_set messageswin 0 #f)

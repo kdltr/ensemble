@@ -271,25 +271,40 @@
             (request-hole-messages room-id m limit))
           (ipc-send 'message room-id (cleanup-event m)))
         (reverse tl))
+      ;; TODO send temporary messages for this room
+      (unless (zero? offset)
+        (for-each
+          (lambda (m) (ipc-send 'message room-id m))
+          (temporary-messages room-id)))
       (ipc-send 'bundle-end))))
 
 (safe-environment-set!
   rpc-env 'message:text
   (lambda (room-id str)
-    (let ((transaction-id (new-transaction-id)))
+    (let ((transaction-id (new-transaction-id))
+          (event-contents `((msgtype . "m.text")
+                            (body . ,str))))
+      ;; TODO add-temporary-message
+      (add-temporary-message! room-id
+                              transaction-id
+                              event-contents)
       (defer 'message room-send
-             room-id 'm.room.message transaction-id
-             `((msgtype . "m.text")
-               (body . ,str))))))
+             room-id 'm.room.message
+             transaction-id event-contents))))
 
 (safe-environment-set!
   rpc-env 'message:emote
   (lambda (room-id str)
-    (let ((transaction-id (new-transaction-id)))
+    (let ((transaction-id (new-transaction-id))
+          (event-contents `((msgtype . "m.emote")
+                            (body . ,str))))
+      ;; TODO add-temporary-message
+      (add-temporary-message! room-id
+                              transaction-id
+                              event-contents)
       (defer 'message room-send
-             room-id 'm.room.message transaction-id
-             `((msgtype . "m.emote")
-               (body . ,str))))))
+             room-id 'm.room.message
+             transaction-id event-contents))))
 
 (safe-environment-set!
   rpc-env 'mark-last-message-as-read
@@ -383,6 +398,42 @@
     (and marker (symbol->string marker))))
 
 
+;; Temporary messages
+;; ==================
+
+(define *temporary-messages* '())
+
+(define (add-temporary-message! room-id txid content)
+  (let* ((event `((sender . ,(mxid))
+                  (content . ,content)
+                  (type . "m.room.message")
+                  (origin_server_ts . ,(* 1000 (current-seconds)))))
+         (formated (print-event event (room-context room-id)))
+         (fake-event `(,@event
+                       (formated . ,formated)
+                       (lowlight . #t)
+                       (transaction-id . ,txid))))
+    (set! *temporary-messages*
+      (append! *temporary-messages* (list (cons room-id fake-event))))
+    (when (get room-id 'frontend-subscribed)
+      (ipc-send 'message room-id fake-event))))
+
+(define (remove-temporary-message! txid)
+  (let* ((room-id 'unknown)
+         (temps (remove! (lambda (p)
+                           (and (equal? txid (mref '(transaction-id) (cdr p)))
+                                (begin (set! room-id (car p)) #t)))
+                         *temporary-messages*)))
+    (when (get room-id 'frontend-subscribed))
+      (ipc-send 'refresh room-id)))
+
+(define (temporary-messages room-id)
+  (filter-map (lambda (p) (and (eqv? (car p) room-id) (cdr p)))
+              *temporary-messages*))
+
+
+;; Startup
+;; =======
 (cond-expand (csi (void)) (else (apply run (command-line-arguments))))
 
 ) ;; backend module
