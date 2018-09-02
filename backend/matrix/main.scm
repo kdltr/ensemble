@@ -1,9 +1,10 @@
 ;; TODO Better error reporting and recovery
-;; TODO Show the result of message sending immediately
 ;; TODO Make a queue of messages to send, to avoid reordering
 ;; TODO send a room-name message when a room name change event is received
 ;; TODO add unit tests, especially for state updating and event printing procedures
 ;; TODO IPC for room leaving
+;; TODO don’t save temporary messages in the cache
+;; TODO treat http throttling errors as retriable
 
 (module (ensemble backend matrix) (run)
 (import
@@ -224,7 +225,10 @@
   (flush-output))
 
 (define (ipc-info msg . rest)
-  (ipc-send 'info (sprintf "~?" msg rest)))
+  (ipc-send 'info (sprintf "[~a] ~?"
+                           (time->string (seconds->local-time)
+                                         "%d/%m %H:%M")
+                           msg rest)))
 
 (define *delayed-responses* '())
 (define +delay-marker+ (gensym 'delay))
