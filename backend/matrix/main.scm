@@ -50,6 +50,7 @@
 (define *profile-dir*)
 (define *cache-dir*)
 (define *state-file*)
+(define *last-known-limit* 10)
 
 (define +ensemble-version+ "dev")
 
@@ -260,36 +261,47 @@
 (safe-environment-set!
   rpc-env 'fetch-events
   (lambda (room-id limit offset)
+    (set! *last-known-limit* limit)
     (let* ((tl (room-timeline room-id limit: limit offset: offset)))
       (ipc-send 'bundle-start)
       (ipc-send 'clear room-id)
       (ipc-send 'room-name room-id (or (room-display-name (room-context room-id))
                                        (symbol->string room-id)))
-      (for-each
-        (lambda (m)
-          (when (hole-event? m)
-            (request-hole-messages room-id m limit))
-          (ipc-send 'message room-id (cleanup-event m)))
-        (reverse tl))
+      (send-timeline-events room-id tl)
+      ;; TODO send temporary messages for this room
+      (when (zero? offset)
+        (for-each
+          (lambda (m) (ipc-send 'message room-id m))
+          (room-temporary-messages room-id)))
       (ipc-send 'bundle-end))))
 
 (safe-environment-set!
   rpc-env 'message:text
   (lambda (room-id str)
-    (let ((transaction-id (new-transaction-id)))
+    (let ((transaction-id (new-transaction-id))
+          (event-contents `((msgtype . "m.text")
+                            (body . ,str))))
+      ;; TODO add-temporary-message
+      (add-temporary-message! room-id
+                              transaction-id
+                              event-contents)
       (defer 'message room-send
-             room-id 'm.room.message transaction-id
-             `((msgtype . "m.text")
-               (body . ,str))))))
+             room-id 'm.room.message
+             transaction-id event-contents))))
 
 (safe-environment-set!
   rpc-env 'message:emote
   (lambda (room-id str)
-    (let ((transaction-id (new-transaction-id)))
+    (let ((transaction-id (new-transaction-id))
+          (event-contents `((msgtype . "m.emote")
+                            (body . ,str))))
+      ;; TODO add-temporary-message
+      (add-temporary-message! room-id
+                              transaction-id
+                              event-contents)
       (defer 'message room-send
-             room-id 'm.room.message transaction-id
-             `((msgtype . "m.emote")
-               (body . ,str))))))
+             room-id 'm.room.message
+             transaction-id event-contents))))
 
 (safe-environment-set!
   rpc-env 'mark-last-message-as-read
@@ -383,6 +395,42 @@
     (and marker (symbol->string marker))))
 
 
+;; Temporary messages
+;; ==================
+
+(define (event-transaction-id evt)
+  (json-true? (mref '(unsigned transaction_id) evt)))
+
+(define (room-temporary-messages room-id)
+  (map cdr (or (get room-id 'temporary-messages) '())))
+
+(define (add-temporary-message! room-id txid content)
+  (let* ((event `((sender . ,(mxid))
+                  (content . ,content)
+                  (type . "m.room.message")
+                  (origin_server_ts . ,(* 1000 (current-seconds)))))
+         (formated (print-event event (room-context room-id)))
+         (fake-event `((event_id . ,(string-append "$fake-" txid))
+                       (formated . ,formated)
+                       (lowlight . #t))))
+    (put! room-id 'temporary-messages
+      (append! (or (get room-id 'temporary-messages) '())
+               (list (cons txid fake-event))))
+    (when (get room-id 'frontend-subscribed)
+      (ipc-send 'message room-id fake-event))))
+
+(define (remove-temporary-messages! room-id events)
+  (let* ((txids-to-remove (filter-map event-transaction-id events))
+         (old-temps (or (get room-id 'temporary-messages) '()))
+         (new-temps (remove (lambda (temp) (member (car temp) txids-to-remove))
+                            old-temps)))
+    (info "removing temps: ~s" txids-to-remove)
+    (put! room-id 'temporary-messages new-temps)
+    (not (equal? old-temps new-temps))))
+
+
+;; Startup
+;; =======
 (cond-expand (csi (void)) (else (apply run (command-line-arguments))))
 
 ) ;; backend module

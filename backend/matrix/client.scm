@@ -354,8 +354,10 @@
          (prev-batch (mref '(timeline prev_batch) room-data))
          (state* (mref '(state events) room-data))
          (state (if (vector? state*) state* #()))
-         (notifs (mref '(unread_notifications notification_count) room-data))
-         (highlights (mref '(unread_notifications highlight_count) room-data))
+         (notifs (json-true? (mref '(unread_notifications notification_count)
+                                   room-data)))
+         (highlights (json-true? (mref '(unread_notifications highlight_count)
+                                       room-data)))
          (old-timeline (room-timeline room-id)))
     (unless (room-exists? room-id)
       (initialize-room! room-id state))
@@ -372,13 +374,12 @@
       (put! room-id 'timeline
             (append timeline-additions old-timeline))
       (put! room-id 'bottom-state new-state)
-      (when (get room-id 'frontend-subscribed)
-        (for-each
-          (lambda (m)
-            (when (hole-event? m)
-              (request-hole-messages room-id m 10))
-            (ipc-send 'message room-id (cleanup-event m)))
-          (reverse timeline-additions))))
+      (let ((subscribed? (get room-id 'frontend-subscribed))
+            (refresh? (remove-temporary-messages! room-id (vector->list events))))
+        (when subscribed?
+          (if refresh?
+              (ipc-send 'refresh room-id)
+              (send-timeline-events room-id timeline-additions)))))
 
     (manage-ephemerals room-id ephemerals)
     (when highlights
@@ -391,6 +392,16 @@
   (ipc-send 'notifications room-id
             (inexact->exact (round (or (get room-id 'highlights) 0)))
             (inexact->exact (round (or (get room-id 'notifications) 0)))))
+
+(define (send-timeline-events room-id tl)
+  (for-each
+    (lambda (m)
+      (when (hole-event? m)
+        (request-hole-messages room-id m *last-known-limit*))
+      (ipc-send 'message room-id (cleanup-event m)))
+    (reverse tl)))
+
+
 
 (define *rooms-invited* '())
 (define (register-invitation id+invited-room)
