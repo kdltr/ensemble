@@ -101,7 +101,7 @@
                            ...))
     ((_ k . body) (define-key (k) . body))))
 
-(define-key KEY_BACKSPACE
+(define-key (KEY_BACKSPACE #\delete)
   (buffer-remove! (sub1 cursor-pos))
   (move-cursor -1))
 
