@@ -50,6 +50,7 @@
 (define *profile-dir*)
 (define *cache-dir*)
 (define *state-file*)
+(define *last-known-limit* 10)
 
 (define +ensemble-version+ "dev")
 
@@ -260,22 +261,18 @@
 (safe-environment-set!
   rpc-env 'fetch-events
   (lambda (room-id limit offset)
+    (set! *last-known-limit* limit)
     (let* ((tl (room-timeline room-id limit: limit offset: offset)))
       (ipc-send 'bundle-start)
       (ipc-send 'clear room-id)
       (ipc-send 'room-name room-id (or (room-display-name (room-context room-id))
                                        (symbol->string room-id)))
-      (for-each
-        (lambda (m)
-          (when (hole-event? m)
-            (request-hole-messages room-id m limit))
-          (ipc-send 'message room-id (cleanup-event m)))
-        (reverse tl))
+      (send-timeline-events room-id tl)
       ;; TODO send temporary messages for this room
-      (unless (zero? offset)
+      (when (zero? offset)
         (for-each
           (lambda (m) (ipc-send 'message room-id m))
-          (temporary-messages room-id)))
+          (room-temporary-messages room-id)))
       (ipc-send 'bundle-end))))
 
 (safe-environment-set!
@@ -401,7 +398,11 @@
 ;; Temporary messages
 ;; ==================
 
-(define *temporary-messages* '())
+(define (event-transaction-id evt)
+  (json-true? (mref '(unsigned transaction_id) evt)))
+
+(define (room-temporary-messages room-id)
+  (map cdr (or (get room-id 'temporary-messages) '())))
 
 (define (add-temporary-message! room-id txid content)
   (let* ((event `((sender . ,(mxid))
@@ -409,27 +410,23 @@
                   (type . "m.room.message")
                   (origin_server_ts . ,(* 1000 (current-seconds)))))
          (formated (print-event event (room-context room-id)))
-         (fake-event `(,@event
+         (fake-event `((event_id . ,(string-append "$fake-" txid))
                        (formated . ,formated)
-                       (lowlight . #t)
-                       (transaction-id . ,txid))))
-    (set! *temporary-messages*
-      (append! *temporary-messages* (list (cons room-id fake-event))))
+                       (lowlight . #t))))
+    (put! room-id 'temporary-messages
+      (append! (or (get room-id 'temporary-messages) '())
+               (list (cons txid fake-event))))
     (when (get room-id 'frontend-subscribed)
       (ipc-send 'message room-id fake-event))))
 
-(define (remove-temporary-message! txid)
-  (let* ((room-id 'unknown)
-         (temps (remove! (lambda (p)
-                           (and (equal? txid (mref '(transaction-id) (cdr p)))
-                                (begin (set! room-id (car p)) #t)))
-                         *temporary-messages*)))
-    (when (get room-id 'frontend-subscribed))
-      (ipc-send 'refresh room-id)))
-
-(define (temporary-messages room-id)
-  (filter-map (lambda (p) (and (eqv? (car p) room-id) (cdr p)))
-              *temporary-messages*))
+(define (remove-temporary-messages! room-id events)
+  (let* ((txids-to-remove (filter-map event-transaction-id events))
+         (old-temps (or (get room-id 'temporary-messages) '()))
+         (new-temps (remove (lambda (temp) (member (car temp) txids-to-remove))
+                            old-temps)))
+    (info "removing temps: ~s" txids-to-remove)
+    (put! room-id 'temporary-messages new-temps)
+    (not (equal? old-temps new-temps))))
 
 
 ;; Startup
