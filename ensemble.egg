@@ -23,17 +23,23 @@
  (components
    ;; Helper libraries
    (extension ensemble.libs.debug
-              (source "libs/debug.scm"))
+              (source "libs/debug.scm")
+              (csc-options "-d0"))
    (extension ensemble.libs.locations
-              (source "libs/locations.scm"))
+              (source "libs/locations.scm")
+              (csc-options "-d0"))
    (extension ensemble.libs.nonblocking-ports
-              (source "libs/nonblocking-ports.scm"))
+              (source "libs/nonblocking-ports.scm")
+              (csc-options "-d0"))
    (extension ensemble.libs.json-help
-              (source "libs/json-help.scm"))
+              (source "libs/json-help.scm")
+              (csc-options "-d0"))
    (extension ensemble.libs.bindings
-              (source "libs/bindings.scm"))
+              (source "libs/bindings.scm")
+              (csc-options "-d0"))
    (extension ensemble.libs.concurrency
               (source "libs/concurrency.scm")
+              (csc-options "-d0")
               (component-dependencies
                 ensemble.libs.debug
                 ensemble.libs.nonblocking-ports))
@@ -60,6 +66,7 @@
                 ensemble.libs.locations
                 ensemble.libs.concurrency))
    (program ensemble
+            (csc-options "-d0")
             (component-dependencies
               ensemble.libs.bindings
               ensemble.interface.console))
