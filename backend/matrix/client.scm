@@ -84,7 +84,7 @@
       (for-each
         (lambda (r)
           (info "Saving state for: ~a" r)
-          (write `(room ,r ,(symbol-plist r)))
+          (write `(room ,r ,(room-data r)))
           (newline))
         *rooms*)
       (for-each
@@ -95,6 +95,22 @@
         *rooms-invited*)
       (write `(next-batch ,*next-batch*))))
   (info "Done saving state"))
+
+(define +properties-saved+
+  '(notifications highlights read-marker timeline bottom-state))
+
+(define (room-data r)
+  (define (extract! sym)
+    (let ((prop value rest (get-properties sym +properties-saved+)))
+      (set! (symbol-plist sym) (or rest '()))
+      (if rest
+          (cons* prop value (extract! sym))
+          '())))
+
+  (let ((tmp-sym (gensym))
+        (plist (symbol-plist r)))
+    (set! (symbol-plist tmp-sym) plist)
+    (extract! tmp-sym)))
 
 (define (load-state)
   (ipc-info "Loading profile cache")
