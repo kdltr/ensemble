@@ -450,7 +450,7 @@
     (lambda (_) (reset)))
   (cond-expand (debug (info-port (open-output-file "frontend.log"))) (else))
   (start-interface)
-  (unless (string-contains *locale* "UTF-8")
+  (unless (irregex-search '(w/nocase "utf" (? "-") "8") *locale*)
     (special-window-write 'ensemble
       "Warning: you don't seem to be using an UTF-8 locale"))
   (special-window-write 'ensemble "Loading config…")
