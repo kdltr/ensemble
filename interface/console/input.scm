@@ -114,7 +114,7 @@
 (define-key (KEY_HOME #\x01) ;; C-a
   (move-cursor 'left))
 
-(define-key #\x04 ;; C-d
+(define-key (KEY_DC #\x04) ;; C-d
   (buffer-remove! cursor-pos))
 
 (define-key (KEY_END #\x05) ;; C-e
@@ -188,22 +188,21 @@
                (move-cursor (- (right) cursor-pos)))
         (move-cursor (add1 (- new-pos cursor-pos))))))
 
-(define (delete-word-right)
+(define-key #(#\escape #\d)
   (unless (= cursor-pos (string-length input-string))
     (set! input-string
       (string-append
         (substring input-string 0 cursor-pos)
         (substring input-string (add1 (find-word-right input-string cursor-pos)))))))
 
-(define-key #(#\escape #\d)
-  (delete-word-right))
-
 (define-key #\x17 ;; C-w
-  (let* ((old-pos cursor-pos)
-         (_ (move-left-word))
-         (new-pos cursor-pos))
-    (unless (= old-pos new-pos)
-      (delete-word-right))))
+  (unless (= cursor-pos 0)
+    (let ((word-left-pos (find-word-left input-string (sub1 cursor-pos))))
+      (set! input-string
+        (string-append
+          (substring input-string 0 word-left-pos)
+          (substring input-string cursor-pos)))
+      (move-cursor (- word-left-pos cursor-pos)))))
 
 (define-key #\x0e ;; C-n
   (switch-to-adjacent (append *special-windows* *room-windows*)))
