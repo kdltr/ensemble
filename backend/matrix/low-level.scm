@@ -35,7 +35,7 @@
 ;; http-client configuration
 
 (http:max-retry-attempts 0)
-(http:client-software '(("Ensemble Matrix client" +ensemble-version+ #f)))
+(http:client-software `(("Ensemble Matrix client" ,+ensemble-version+ #f)))
 
 ;; Custom version of call-with-input-request that adds the Matrix access token to
 ;; the query parameters and fiddles with headers.
