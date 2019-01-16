@@ -415,12 +415,16 @@
              (attrs (cond ((> hls 0) STATUS_HIGHLIGHT_ATTRS)
                           ((> notifs 0) STATUS_NORMAL_ATTRS)
                           (else STATUS_LOWLIGHT_ATTRS))))
-        (wattron statuswin attrs)
-        (waddstr* statuswin
-                  (if (eqv? win *current-window*)
-                      (sprintf "[~?] " fmt args)
-                      (sprintf "~? " fmt args)))
-        (wattroff statuswin attrs)))
+        (when (or (> hls 0)
+                  (> notifs 0)
+                  (special-window? win)
+                  (eqv? win *current-window*))
+          (wattron statuswin attrs)
+          (waddstr* statuswin
+                    (if (eqv? win *current-window*)
+                        (sprintf "[~?] " fmt args)
+                        (sprintf "~? " fmt args)))
+          (wattroff statuswin attrs))))
     (append *special-windows* *room-windows*)))
 
 (define (room-offset room-id)
