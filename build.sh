@@ -3,7 +3,7 @@
 set -e
 
 extract_dependencies() {
-    csi -e "(for-each print (alist-ref 'dependencies (with-input-from-file \"ensemble.egg\" read)))" | grep -Ev '(ncurses|rest-bind|openssl|bind|utf8)'
+    csi -e "(for-each print (alist-ref 'dependencies (with-input-from-file \"ensemble.egg\" read)))" | grep -Ev '(ncurses|bind|utf8)'
 }
 
 build_normal_deps() {
@@ -39,8 +39,6 @@ fi
 test -d .git && git submodule update --init
 
 ( build_custom_dep chicken-ncurses )
-( build_custom_dep rest-bind )
-( build_custom_dep openssl )
 
 build_normal_deps
 
