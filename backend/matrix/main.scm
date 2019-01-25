@@ -97,6 +97,7 @@
   (main-loop))
 
 (define (restart)
+  (flock *lock-fd* #f)
   (process-execute (program-name) (command-line-arguments)))
 
 (define ((make-ssl-server-connector ctx) uri proxy)

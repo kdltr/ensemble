@@ -4,12 +4,14 @@
 (foreign-declare "#include <locale.h>")
 (foreign-declare "#include <sys/file.h>")
 
-(define (flock fd)
-  (let ((lock (foreign-lambda* int ((int fd))
-                               "C_return(flock(fd, LOCK_EX|LOCK_NB));")))
-    (if (zero? (lock fd))
+(define (flock fd #!optional (lock? #t))
+  (let ((lock (foreign-lambda* int ((int fd) (bool lock))
+                               "int operation;"
+                               "if (lock) { operation = LOCK_EX; } else { operation = LOCK_UN; }"
+                               "C_return(flock(fd, operation));")))
+    (if (zero? (lock fd lock?))
         #t
-        (error "error while locking file" fd))))
+        (error "error while locking/unlocking file" fd))))
 
 (define (setlocale str)
   ((foreign-lambda* c-string ((c-string str))
