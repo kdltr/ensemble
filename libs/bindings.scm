@@ -7,7 +7,8 @@
 (define (flock fd #!optional (lock? #t))
   (let ((lock (foreign-lambda* int ((int fd) (bool lock))
                                "int operation;"
-                               "if (lock) { operation = LOCK_EX; } else { operation = LOCK_UN; }"
+                               ;; LOCK_NB so that flock returns immediatly when file is already locked
+                               "if (lock) { operation = LOCK_EX | LOCK_NB; } else { operation = LOCK_UN; }"
                                "C_return(flock(fd, operation));")))
     (if (zero? (lock fd lock?))
         #t
