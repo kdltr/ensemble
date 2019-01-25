@@ -295,28 +295,25 @@
 ;; TUI
 ;; ===
 
-(define STATUS_PAIR 1)
-(define STATUS_HIGHLIGHT_PAIR 2)
-(define STATUS_LOWLIGHT_PAIR 3)
-(define MESSAGE_HIGHLIGHT_PAIR 4)
-(define MESSAGE_LOWLIGHT_PAIR 5)
-(define STATUS_LOWLIGHT_ATTRS)
-(define STATUS_HIGHLIGHT_ATTRS)
+(define STATUS_HIGHLIGHT_PAIR 1)
+(define MESSAGE_HIGHLIGHT_PAIR 2)
+
+(define MESSAGE_LOWLIGHT_ATTRS)
+
 (define STATUS_NORMAL_ATTRS)
+(define STATUS_HIGHLIGHT_ATTRS)
+(define STATUS_LOWLIGHT_ATTRS)
 
 (define (initialize-attributes)
   (start_color)
-  (init_pair STATUS_PAIR COLOR_BLACK COLOR_WHITE)
-  (init_pair STATUS_HIGHLIGHT_PAIR COLOR_BLUE COLOR_WHITE)
-  (init_pair STATUS_LOWLIGHT_PAIR 8 COLOR_WHITE)
-  (init_pair MESSAGE_HIGHLIGHT_PAIR COLOR_CYAN COLOR_BLACK)
-  (init_pair MESSAGE_LOWLIGHT_PAIR 8 COLOR_BLACK)
-  (set! STATUS_LOWLIGHT_ATTRS
-    (COLOR_PAIR STATUS_LOWLIGHT_PAIR))
+  (use_default_colors)
+  (init_pair STATUS_HIGHLIGHT_PAIR -1 COLOR_BLUE)
+  (init_pair MESSAGE_HIGHLIGHT_PAIR COLOR_CYAN -1)
+  (set! MESSAGE_LOWLIGHT_ATTRS A_UNDERLINE)
+  (set! STATUS_NORMAL_ATTRS 0)
   (set! STATUS_HIGHLIGHT_ATTRS
     (COLOR_PAIR STATUS_HIGHLIGHT_PAIR))
-  (set! STATUS_NORMAL_ATTRS
-    (COLOR_PAIR STATUS_PAIR)))
+  (set! STATUS_LOWLIGHT_ATTRS A_DIM))
 
 (define (start-interface)
   ;; Make ncurses wait less time when receiving an ESC character
@@ -333,7 +330,7 @@
   (set! inputwin (newwin 1 cols (- rows 1) 0))
   (keypad inputwin #t)
   (set! statuswin (newwin 1 cols (- rows 2) 0))
-  (wbkgdset statuswin (COLOR_PAIR STATUS_PAIR))
+  (wbkgdset statuswin A_REVERSE)
   (special-window-write 'ensemble "Loading…"))
 
 ;; FIXME less hacky solution
@@ -419,12 +416,12 @@
                   (> notifs 0)
                   (special-window? win)
                   (eqv? win *current-window*))
-          (wattron statuswin attrs)
+          (wattrset statuswin attrs)
           (waddstr* statuswin
                     (if (eqv? win *current-window*)
                         (sprintf "[~?] " fmt args)
                         (sprintf "~? " fmt args)))
-          (wattroff statuswin attrs))))
+          (wattrset statuswin 0))))
     (append *special-windows* *room-windows*)))
 
 (define (room-offset room-id)
@@ -563,10 +560,11 @@
            (when (alist-ref 'highlight (caddr msg))
              (wcolor_set messageswin MESSAGE_HIGHLIGHT_PAIR #f))
            (when (alist-ref 'lowlight (caddr msg))
-             (wcolor_set messageswin MESSAGE_LOWLIGHT_PAIR #f))
+             (wattrset messageswin MESSAGE_LOWLIGHT_ATTRS))
            (wprintw messageswin "~A"
                     (alist-ref 'formated (caddr msg)))
            (wcolor_set messageswin 0 #f)
+           (wattrset messageswin 0)
            (when (equal? (alist-ref 'event_id (caddr msg))
                          *read-marker*)
              (wprintw messageswin "~A" (make-string cols #\-)))
