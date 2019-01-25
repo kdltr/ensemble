@@ -72,6 +72,7 @@
 (define (run-as-backend . args)
   (when (not (= 1 (length args)))
     (error "Usage: backend PROFILE"))
+  (enable-warnings #f) ;; suppress warnings about exceptions in threads
   (set! *profile-dir* (make-pathname (config-home) (car args)))
   (set! *cache-dir* (make-pathname (cache-home) (car args)))
   (create-directory *profile-dir* #t)
