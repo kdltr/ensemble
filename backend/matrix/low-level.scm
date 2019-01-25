@@ -4,11 +4,6 @@
 (define (read-json port)
   (string->json (read-string #f port)))
 
-(cond-expand
-      (debug #;(use describe trace)
-             #;(trace read-json json->string))
-      (else))
-
 ;; Chaque requête :
 ;; + HTTPS
 ;; + Accept: application/json
@@ -57,11 +52,6 @@
          (request-rewritten (update-request req
                                             uri: uri-rewritten
                                             headers: headers-rewritten)))
-    (cond-expand
-          (debug #;(fprintf (current-error-port) "SENDING REQUEST:\n")
-                 #;(describe request-rewritten (current-error-port))
-                 #;(newline (current-error-port)))
-          (else))
     (http:call-with-input-request request-rewritten writer reader)))
 
 (define-syntax define-endpoint
