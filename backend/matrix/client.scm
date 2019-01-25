@@ -36,7 +36,7 @@
   (let ((cnt 0))
     (lambda ()
       (set! cnt (add1 cnt))
-      (sprintf "~a-~a" (current-seconds) cnt))))
+      (sprintf "~a-~a-~a" (current-process-id) (current-seconds) cnt))))
 
 (define (password-login user password)
   (let ((res (login `((type . "m.login.password")

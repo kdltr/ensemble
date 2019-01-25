@@ -44,11 +44,13 @@
                                     port: (uri-port (server-uri))
                                     query: (append (if (access-token) `((access_token . ,(access-token))) '())
                                                    (uri-query (request-uri req)))))
+         (hdrs (request-headers req))
          (headers-rewritten (headers (cons* '(accept application/json)
-                                            (if (member (request-method req) '(PUT POST))
+                                            (if (and (member (request-method req) '(PUT POST))
+                                                     (not (header-value 'content-type hdrs #f)))
                                                 '((content-type application/json))
                                                 '()))
-                                     (request-headers req)))
+                                     hdrs))
          (request-rewritten (update-request req
                                             uri: uri-rewritten
                                             headers: headers-rewritten)))
@@ -86,3 +88,20 @@
   (server-uri (uri-reference uri))
   (vector-any (cut equal? +supported-version+ <>)
               (or (alist-ref 'versions (server-versions)) #())))
+
+
+;; Media endpoints
+
+(define media-api-uri (uri-reference "http://PLACEHOLDER/_matrix/media/r0"))
+
+(define-method (media-config "config") media-api-uri #f read-json)
+
+(define (media-upload mime filename data)
+  (call-with-input-request
+    (make-request uri: (update-uri media-api-uri
+                                   path: (append (uri-path media-api-uri) '("upload"))
+                                   query: `((filename . ,filename)))
+                  headers: (headers `((content-type ,mime)))
+                  method: 'POST)
+    data
+    read-json))

@@ -22,6 +22,7 @@
   (chicken port)
   (chicken process)
   (chicken process-context)
+  (chicken process-context posix)
   (chicken time)
   (chicken time posix)
   miscmacros
@@ -63,6 +64,14 @@
 (include-relative "client.scm")
 
 (define (run . args)
+  (cond ((member "-u" args)
+         (apply run-as-uploader args))
+        ((= 1 (length args))
+         (apply run-as-backend args))
+        (else
+          (error "Usage: backend PROFILE"))))
+
+(define (run-as-backend . args)
   (when (not (= 1 (length args)))
     (error "Usage: backend PROFILE"))
   (set! *profile-dir* (make-pathname (config-home) (car args)))
@@ -95,6 +104,43 @@
   (defer 'rpc read)
   (connect)
   (main-loop))
+
+(define (run-as-uploader profile-name . rest)
+  (let ((upload-directive (cdr (member "-u" rest))))
+    (unless (= 3 (length upload-directive))
+      (error "Usage: backend PROFILE -u ROOM-ID MIME-TYPE FILENAME"))
+    (let* ((room-id (find-association profile-name (car upload-directive)))
+           (mime-type (cadr upload-directive))
+           (filename (caddr upload-directive))
+           (data (with-input-from-file filename read-string))
+           (message-type (case (string->symbol (car (string-split mime-type "/")))
+                           ((audio) "m.audio")
+                           ((video) "m.video")
+                           ((image) "m.image")
+                           (else "m.file"))))
+      (set! *profile-dir* (make-pathname (config-home) profile-name))
+      (load-profile)
+      (room-send room-id
+                 'm.room.message
+                 (new-transaction-id)
+                 `((msgtype . ,message-type)
+                   (body . ,(pathname-strip-directory filename))
+                   (url . ,(mref '(content_uri)
+                                 (media-upload (string->symbol mime-type) filename data)))))
+      )))
+
+;; TODO put all that on the server as custom room config
+;; Window associations should not appear in the backend at all
+(define (find-association profile name-or-id)
+  (let* ((conf (with-input-from-file (make-pathname (config-home) "window-associations")
+                 read-list)))
+    (or (and-let* ((_ (not (null? conf)))
+                   (assocs (mref '(associations) conf))
+                   (assocs (car assocs))
+                   (assocs (alist-ref profile assocs string=?))
+                   (found (rassoc (string->symbol name-or-id) assocs)))
+             (car found))
+        name-or-id)))
 
 (define (restart)
   (flock *lock-fd* #f)
