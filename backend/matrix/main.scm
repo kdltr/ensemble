@@ -2,8 +2,6 @@
 ;; TODO Make a queue of messages to send, to avoid reordering
 ;; TODO send a room-name message when a room name change event is received
 ;; TODO add unit tests, especially for state updating and event printing procedures
-;; TODO IPC for room leaving
-;; TODO don’t save temporary messages in the cache
 ;; TODO treat http throttling errors as retriable
 
 (module (ensemble backend matrix) (run)
@@ -317,7 +315,6 @@
       (ipc-send 'room-name room-id (or (room-display-name (room-context room-id))
                                        (symbol->string room-id)))
       (send-timeline-events room-id tl)
-      ;; TODO send temporary messages for this room
       (when (zero? offset)
         (for-each
           (lambda (m) (ipc-send 'message room-id m))
@@ -330,7 +327,6 @@
     (let ((transaction-id (new-transaction-id))
           (event-contents `((msgtype . "m.text")
                             (body . ,str))))
-      ;; TODO add-temporary-message
       (add-temporary-message! room-id
                               transaction-id
                               event-contents)
@@ -344,7 +340,6 @@
     (let ((transaction-id (new-transaction-id))
           (event-contents `((msgtype . "m.emote")
                             (body . ,str))))
-      ;; TODO add-temporary-message
       (add-temporary-message! room-id
                               transaction-id
                               event-contents)
