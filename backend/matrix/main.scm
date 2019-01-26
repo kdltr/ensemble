@@ -184,13 +184,18 @@
     (load-profile))
   (load-state)
   (for-each send-notifications (joined-rooms))
-  (ipc-info "Backend started!")
-  (defer 'sync sync since: *next-batch*))
+  (ipc-info "Synchronizing…")
+  (defer 'initial-sync sync since: *next-batch*))
 
 (define (main-loop)
   (let* ((th (receive-defered))
          (who datum (thread-join-protected! th)))
     (case who
+      ((initial-sync)
+       (let ((next-batch (handle-sync datum)))
+         (ipc-info "Initial synchronization finished! You are in ~a rooms."
+                   (length (joined-rooms)))
+         (defer 'sync sync timeout: 30000 since: next-batch)))
       ((sync) (defer 'sync sync timeout: 30000 since: (handle-sync datum)))
       ((rpc) (handle-rpc datum) (defer 'rpc read))
       ((hole-messages) (apply fill-hole datum))
