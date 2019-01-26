@@ -18,7 +18,7 @@
 ;; - Vérifier le Content-Type
 ;; - Vérifier le retour de medea
 
-(define +supported-version+ "r0.2.0")
+(define +supported-version+ "r0.4.0")
 
 ;; The real scheme, host and port will be rewritten when doing the actual requests
 (define api-uri (uri-reference "http://PLACEHOLDER/_matrix/client/r0"))
@@ -80,6 +80,7 @@
 (define-endpoint PUT (room-send "rooms" room-id "send" event-type transaction-id))
 (define-endpoint GET (room-messages "rooms" room-id "messages" #!key from to dir limit))
 (define-endpoint POST (room-receipt "rooms" room-id "receipt" receipt-type event-id))
+(define-endpoint POST (room-read-markers "rooms" room-id "read_markers"))
 
 (define-endpoint GET (get-filter "user" user-id "filter" filter-id))
 (define-endpoint POST (create-filter "user" user-id "filter"))

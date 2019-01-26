@@ -1,9 +1,13 @@
 ;; Utilities
 ;; =========
 
+;; TODO update m.read when messages are shown on the screen, and
+;;      m.fully_read on user request
 (define (room-mark-read room evt)
   (defer 'receipt
-    room-receipt room 'm.read evt '()))
+    room-read-markers room
+    `((m.read . ,evt)
+      (m.fully_read . ,evt))))
 
 (define (mark-last-message-as-read room-id)
   (let* ((tl (room-timeline room-id limit: 1))
@@ -336,22 +340,14 @@
                        state
                        state-events)))
 
-(define (manage-ephemerals room-id ephemerals)
+(define (manage-account-data room-id events)
   (vector-for-each (lambda (i evt)
-                     (when (equal? (mref '(type) evt) "m.receipt")
-                       (let ((datum (mref '(content) evt)))
-                         (for-each
-                           (lambda (id+reads)
-                             (when (member (string-downcase (mxid))
-                                           (map (o string-downcase symbol->string car)
-                                             (or (mref '(m.read) (cdr id+reads)) '())))
-                               (info "[marker] id+reads: ~s~%" id+reads)
-                               (read-marker-set! room-id (car id+reads))
-                               (when (get room-id 'frontend-subscribed)
-                                 (ipc-send 'read-marker room-id (car id+reads)))))
-                           datum)
-                         )))
-                   ephemerals))
+                     (when (equal? (mref '(type) evt) "m.fully_read")
+                       (let ((id (string->symbol (mref '(content event_id) evt))))
+                         (read-marker-set! room-id id)
+                         (when (get room-id 'frontend-subscribed)
+                           (ipc-send 'read-marker room-id id)))))
+                   events))
 
 (define (handle-sync batch)
   (let ((next (mref '(next_batch) batch)))
@@ -366,7 +362,7 @@
          (room-data (cdr id+data))
          (limited (mref '(timeline limited) room-data))
          (events (mref '(timeline events) room-data))
-         (ephemerals (mref '(ephemeral events) room-data))
+         (account-data (mref '(account_data events) room-data))
          (prev-batch (mref '(timeline prev_batch) room-data))
          (state* (mref '(state events) room-data))
          (state (if (vector? state*) state* #()))
@@ -397,7 +393,7 @@
               (ipc-send 'refresh room-id)
               (send-timeline-events room-id timeline-additions)))))
 
-    (manage-ephemerals room-id ephemerals)
+    (manage-account-data room-id account-data)
     (when highlights
       (put! room-id 'highlights highlights))
     (when notifs
