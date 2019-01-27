@@ -141,6 +141,8 @@
 
 (define (restart)
   (flock *lock-fd* #f)
+  ;; FIXME executable may not be in $PATH, frontend also tries to find
+  ;;       it in the current directory
   (process-execute (program-name) (command-line-arguments)))
 
 (define ((make-ssl-server-connector ctx) uri proxy)
