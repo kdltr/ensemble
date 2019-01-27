@@ -20,7 +20,7 @@
    miscmacros)
  (platform (not windows))
  ;; TODO make dynamic-only the default with CHICKEN 5.1 and add a feature for static build
- (cond-expand
+ #;(cond-expand
        (dynamic-only (component-options (linkage dynamic)))
        (else))
  (components
