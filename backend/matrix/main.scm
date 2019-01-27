@@ -62,6 +62,11 @@
 (include-relative "client.scm")
 
 (define (run . args)
+  ;; Enable server certificate validation for https URIs.
+  (http:server-connector
+    (make-ssl-server-connector
+      (ssl-make-client-context* verify?: (not (member "--no-ssl-verify"
+                                                      args)))))
   (cond ((member "-u" args)
          (apply run-as-uploader args))
         ((= 1 (length args))
@@ -69,12 +74,10 @@
         (else
           (error "Usage: backend PROFILE"))))
 
-(define (run-as-backend . args)
-  (when (not (= 1 (length args)))
-    (error "Usage: backend PROFILE"))
+(define (run-as-backend profile-name . args)
   (enable-warnings #f) ;; suppress warnings about exceptions in threads
-  (set! *profile-dir* (make-pathname (config-home) (car args)))
-  (set! *cache-dir* (make-pathname (cache-home) (car args)))
+  (set! *profile-dir* (make-pathname (config-home) profile-name))
+  (set! *cache-dir* (make-pathname (cache-home) profile-name))
   (create-directory *profile-dir* #t)
   (create-directory *cache-dir* #t)
   (set! *state-file* (make-pathname *cache-dir* "state"))
@@ -84,7 +87,7 @@
   (handle-exceptions exn
     (error "This profile is already in use")
     (flock *lock-fd*))
-  (cond-expand (debug (info-port (open-output-file (string-append "backend-" (car args) ".log"))))
+  (cond-expand (debug (info-port (open-output-file (string-append "backend-" profile-name ".log"))))
                (else))
   (let ((in-port (open-input-file*/nonblocking 0))
         (out-port (open-output-file*/nonblocking 1)))
@@ -95,11 +98,6 @@
                (when *next-batch* (save-state))
                (close-output-port out-port)
                (close-input-port in-port))))
-  ;; Enable server certificate validation for https URIs.
-  (http:server-connector
-    (make-ssl-server-connector
-      (ssl-make-client-context* verify?: (not (member "--no-ssl-verify"
-                                                      args)))))
   (defer 'rpc read)
   (connect)
   (main-loop))
