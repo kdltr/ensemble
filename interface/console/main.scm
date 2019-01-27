@@ -463,8 +463,9 @@
       (lambda ()
         (or (process-execute* (make-pathname (current-directory)
                                              +backend-executable+)
-                              '("default"))
-            (process-execute* +backend-executable+ '("default"))))))
+                              (cons "default" (cdr (argv))))
+            (process-execute* +backend-executable+
+                              (cons "default" (cdr (argv))))))))
   (thread-start! user-read-loop)
   (thread-start! (lambda () (worker-read-loop worker)))
   (let ((joined-rooms (ipc-query 'joined-rooms)))
