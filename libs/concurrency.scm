@@ -1,7 +1,6 @@
 (module (ensemble libs concurrency) (defer receive-defered retry
-                                     start-worker worker-wait
-                                     worker-receive worker-send
-                                     worker-name)
+                                     start-worker worker-wait worker-name
+                                     worker-incomming worker-outgoing)
 (import
   scheme
   (chicken base)
@@ -65,7 +64,7 @@
 ;; Worker processes
 ;; ================
 
-(define-record worker name input output pid)
+(define-record worker name incomming outgoing pid)
 
 (define (start-worker name proc . args)
   (let* ((in1 out1 (create-pipe))
@@ -76,28 +75,46 @@
                   (file-close out2)
                   (duplicate-fileno in2 0)
                   (duplicate-fileno out1 1)
-                  #;(current-input-port
-                    (open-input-file*/nonblocking in2))
-                  #;(current-output-port
-                    (open-output-file*/nonblocking out1))
                   (apply proc args))
                   #t)))
     (file-close in2)
     (file-close out1)
-    (make-worker name
-                 (open-input-file*/nonblocking in1)
-                 (open-output-file*/nonblocking out2)
-                 pid)))
+    (let ((input-port (open-input-file*/nonblocking in1))
+          (output-port (open-output-file*/nonblocking out2))
+          (incomming-chan (gochan 0))
+          (outgoing-chan (gochan 0)))
+      (thread-start! (lambda () (worker-read-loop input-port incomming-chan)))
+      (thread-start! (lambda () (worker-write-loop output-port outgoing-chan)))
+      (make-worker name incomming-chan outgoing-chan pid))))
 
-(define (worker-send w msg)
-  (let ((out (worker-output w)))
-    (write msg out)
-    (newline out)
-    (flush-output out)))
+(define (worker-read-loop input-port channel)
+  (handle-exceptions exn
+    (begin
+      (gochan-close channel exn)
+      (close-input-port input-port))
+    (let ((exp (read input-port)))
+      (if (eof-object? exp)
+          (signal 'end-of-file)
+          (begin
+            (gochan-send channel exp)
+            (worker-read-loop input-port channel))))))
 
-(define (worker-receive w)
-  (values (read (worker-input w)) w))
+(define (worker-write-loop output-port channel)
+  (handle-exceptions exn
+    (begin
+      (gochan-close channel exn)
+      (close-output-port output-port)
+      (signal exn))
+    (let ((exp fail _ (gochan-recv channel)))
+      (if fail
+          (signal 'end-of-file)
+          (begin
+            (write exp output-port)
+            (newline output-port)
+            (flush-output output-port)
+            (worker-write-loop output-port channel))))))
 
 (define (worker-wait w #!optional (nohang #f))
   (process-wait (worker-pid w) nohang))
+
 )

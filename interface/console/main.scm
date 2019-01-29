@@ -54,12 +54,6 @@
 (define worker)
 (define *user-channel* (gochan 0))
 (define *resize-channel* (gochan 0))
-(define *worker-channel* (gochan 0))
-
-(define (worker-read-loop wrk)
-  (let ((exp (worker-receive wrk)))
-    (gochan-send *worker-channel* exp)
-    (unless (eof-object? exp) (worker-read-loop wrk))))
 
 (define (user-read-loop)
   (gochan-send *user-channel* (get-input))
@@ -67,7 +61,7 @@
 
 (define (ipc-send . args)
   (info "Sending IPC: ~s" args)
-  (worker-send worker args))
+  (gochan-send (worker-outgoing worker) args))
 
 
 (define *query-number* 0)
@@ -467,7 +461,6 @@
             (process-execute* +backend-executable+
                               (cons "default" (cdr (argv))))))))
   (thread-start! user-read-loop)
-  (thread-start! (lambda () (worker-read-loop worker)))
   (let ((joined-rooms (ipc-query 'joined-rooms)))
     (for-each add-room-window joined-rooms))
   (main-loop))
@@ -489,15 +482,20 @@
   (wnoutrefresh statuswin)
   (wnoutrefresh inputwin)
   (doupdate)
-  (gochan-select
-    ((*worker-channel* -> msg fail)
-     (handle-backend-response msg))
-    ((*user-channel* -> msg fail)
-     (if (eqv? msg 'resize)
-         (set! *resize-channel* (gochan-after 25))
-         (handle-input msg)))
-    ((*resize-channel* -> msg fail)
-     (resize-terminal)))
+  (let ((msg fail meta
+         (gochan-select*
+           `((,(worker-incomming worker) worker)
+             (,*user-channel* user)
+             (,*resize-channel* resize)))))
+    (if fail
+        (error "select failed" (list msg fail meta))
+    (case meta
+      ((worker) (handle-backend-response msg))
+      ((user) (if (eqv? msg 'resize)
+                  (set! *resize-channel* (gochan-after 25))
+                  (handle-input msg)))
+      ((resize) (resize-terminal))
+      (else (error "unknown channel sent a message" (list msg fail meta))))))
   (main-loop))
 
 (define (get-input)
@@ -579,7 +577,7 @@
   (error "Backend disconnected"))
 
 (define (collect-bundle-messages)
-  (let ((msg (gochan-recv *worker-channel*)))
+  (let ((msg (gochan-recv (worker-incomming worker))))
     (if (equal? msg '(bundle-end))
         '()
         (cons msg (collect-bundle-messages)))))
