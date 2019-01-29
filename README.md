@@ -82,11 +82,10 @@ TUI Roadmap and ideas
 - [ ] Configurable notifications support (external command? sounds? terminal beep?)
 - [ ] End to end encryption
     - [ ] Flat file for room keys, device keys and trusted keys for easy import/export
-- [ ] Optional state/timeline persistent storage
 - [ ] Configurable typing notifications
-- [ ] Media sending
+- [x] Media sending
 - UI design
-    - [ ] Login screen
+    - [x] Login screen
     - [ ] Easy (and lazy) room history navigation
     - [ ] Rooms grouping
     - [ ] Tiny screen support: N900 has a 79x18 terminal (79x21 fullscreen)
@@ -96,19 +95,19 @@ TUI Roadmap and ideas
         - [ ] Images thumbnails
     - Message display
         - [ ] Partial MXID showing when multiple display names are identical
-        - [ ] Message date
+        - [x] Message date
         - [ ] Formated messages viewing
         - [ ] Contrast check for colored messages
         - [ ] Non-intrusive receipt indicators
     - Message / command composition
         - [ ] Formated message composition
-        - [ ] Multi-lines messages with intelligent behaviour when pasting text
+        - [ ] Multi-lines messages with intelligent behaviour when pasting text (bracketed paste)
         - [ ] Typing suggestions / completion (like [this](https://asciinema.org/a/37390))
         - [ ] Suggestion menu / command submenu
     - Encryption
         - [ ] Good E2E key verification interface
         - [ ] Encryption validity indicator
-    - [ ] Last read message indicator
+    - [x] Last read message indicator
     - [ ] Screen indicators when viewing older messages, with a way to quickly go back to the present
     - [ ] Room participants screen with actions menu (private message, kick, ban, …)
     - [ ] Message/events navigation with contextual actions (quote, open/save media, …)
