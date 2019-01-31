@@ -124,13 +124,21 @@
   (unless (or (special-window? *current-window*) (equal? input-string ""))
     (let* ((members-names (ipc-query 'room-members (current-room)))
            (prefix (substring input-string 0 cursor-pos))
-           (candidate (find (cut string-prefix-ci? prefix <>) members-names)))
+           (candidate (find (completion-candidate-checker prefix) members-names)))
       (when candidate
         (when (string-suffix? " (IRC)" candidate) ;; Ugh, kill me now
           (set! candidate (substring candidate 0 (- (string-length candidate) 6))))
         (set! input-string (string-append candidate ": "))
         (move-cursor 'right))
       )))
+
+;; FIXME This is not really right
+;;       It should normalize/decompose the unicode strings and remove non-spacing marks
+;;       https://www.unicode.org/reports/tr15/
+(define (completion-candidate-checker prefix)
+  (lambda (str)
+    (or (string-prefix? prefix str)
+        (string-prefix? prefix (string-filter char-set:latin str)))))
 
 (define-key #\x0B ;; C-k
   (buffer-kill!))
