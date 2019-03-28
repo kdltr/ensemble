@@ -264,7 +264,9 @@
                    (else
                      (sprintf "*** ~A joined but was already there"
                               displayed-name))))
-           (sprintf "*** ~A joined the room" displayed-name))))))
+           (sprintf "*** ~A joined the room" displayed-name)))
+      (else
+        (sprintf "*** ~A membership changed to ~A" displayed-name membership)))))
 
 (define (com.upyum.ensemble.hole-printer evt ctx)
   (sprintf "### Some history excluded..."))

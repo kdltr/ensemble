@@ -10,7 +10,6 @@
 (import
   scheme
   (chicken base)
-  (chicken bitwise)
   (chicken condition)
   (chicken file)
   (chicken format)

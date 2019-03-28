@@ -93,7 +93,8 @@
                  (= (errno) errno/wouldblock))
              (begin
                (thread-wait-for-i/o! fd #:output)
-               (with-nonblocking-write fd thunk))))))
+               (with-nonblocking-write fd thunk))
+             (signal exn)))))
 
 (define (copy-string! target tpos source)
   (let lp ((spos 0)

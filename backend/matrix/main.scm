@@ -29,7 +29,6 @@
   srfi-71
   utf8
   utf8-srfi-13
-  utf8-srfi-14
   vector-lib
   uri-common
   openssl
