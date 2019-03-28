@@ -3,7 +3,6 @@
   scheme
   (chicken base)
   (chicken condition)
-  (chicken foreign)
   (chicken format)
   ncurses
   (ensemble interface console))
