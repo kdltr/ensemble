@@ -271,17 +271,17 @@
 ;; ========
 
 (define (handle-command str)
-  (let* ((cmdline (string-split (string-drop str 1) " "))
-         (cmd (string->symbol (car cmdline)))
-         (args-index (string-index str #\space))
-         (joined-args (substring str (if args-index
-                                         (add1 args-index)
-                                         (string-length str))))
-         (args (cdr cmdline))
-         (proc (alist-ref cmd *commands*)))
-    (if proc
-        (proc joined-args args)
-        (special-window-write 'ensemble "Unknown command: ~a" cmd))))
+  (or (and-let* ((cmdline (string-split (string-drop str 1) " "))
+                 (_ (pair? cmdline))
+                 (cmd (string->symbol (car cmdline)))
+                 (args-index (or (string-index str #\space)
+                                 (sub1 (string-length str))))
+                 (joined-args (substring str (add1 args-index)))
+                 (args (cdr cmdline))
+                 (proc (alist-ref cmd *commands*)))
+           (proc joined-args args)
+           #t)
+      (special-window-write 'ensemble "Unknown command: ~s" str)))
 
 (define *commands* '())
 (define-syntax define-command
