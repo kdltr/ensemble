@@ -219,6 +219,14 @@
         (sprintf "<~a> [redacted]" name))
         ))
 
+(define (m.sticker-printer evt ctx)
+  (let* ((sender (mref '(sender) evt))
+         (name (or (member-displayname sender ctx)
+                   sender))
+         (body (mref '(content body) evt))
+         (url (mref '(content url) evt)))
+    (sprintf "*** ~a sent a sticker: ~a ~a" name body (mxc->url url))))
+
 (define (m.room.member-printer evt ctx)
   (let* ((sender (mref '(sender) evt))
          (sender-name (or (member-displayname sender ctx)
@@ -274,6 +282,7 @@
 (define event-printers
   `((m.room.message . ,m.room.message-printer)
     (m.room.member . ,m.room.member-printer)
+    (m.sticker . ,m.sticker-printer)
     (com.upyum.ensemble.hole . ,com.upyum.ensemble.hole-printer)))
 
 
