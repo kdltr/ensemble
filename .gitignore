@@ -2,3 +2,11 @@
 repo/
 config/
 cache/
+ensemble
+ensemble.backend.matrix
+ensemble.build.sh
+ensemble.install.sh
+*.import.scm
+*.link
+*.so
+*.o
