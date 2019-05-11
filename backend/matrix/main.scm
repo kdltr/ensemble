@@ -26,6 +26,7 @@
   miscmacros
   srfi-1
   srfi-18
+  srfi-69
   srfi-71
   utf8
   utf8-srfi-13
@@ -36,8 +37,7 @@
   (except medea read-json)
   cjson
   rest-bind
-  (prefix http-client #:http)
-  sandbox
+  (prefix http-client |http:|)
   (ensemble libs bindings)
   (ensemble libs concurrency)
   (ensemble libs debug)
@@ -52,10 +52,6 @@
 (define *last-known-limit* 10)
 
 (define +ensemble-version+ "dev")
-
-(define rpc-env (make-safe-environment name: 'rpc-environment
-                                       mutable: #f
-                                       extendable: #f))
 
 (include-relative "low-level.scm")
 (include-relative "client.scm")
@@ -257,10 +253,10 @@
                    (print-call-chain (info-port)))
             (else (void)))
           (ipc-info "Error in backend: ~a" (exception->string exn)))
-        (let ((quoted-exp (cons (car exp)
-                                (map (lambda (o) (list 'quote o))
-                                     (cdr exp)))))
-          (safe-eval quoted-exp environment: rpc-env)))))
+        (let ((procedure (hash-table-ref/default *ipc-procedures* (car exp) #f)))
+          (if procedure
+              (apply procedure (cdr exp))
+              (ipc-info "Error in backend: unknown IPC message received: ~a" exp))))))
 
 (define (exception->string exn)
   (get-condition-property exn 'exn 'message ""))
@@ -299,111 +295,120 @@
 
 ;; ASYNC IPC calls
 
-(safe-environment-set!
-  rpc-env 'subscribe
-  (lambda (room-id)
-    (cond ((memv room-id (joined-rooms))
-           (put! room-id 'frontend-subscribed #t)
-           (and-let* ((mark (get room-id 'read-marker)))
-                (ipc-send 'read-marker room-id mark)))
-          (else (ipc-info "Unable to subscribe to unknown room: ~a" room-id)))))
+(define *ipc-procedures* (make-hash-table))
 
-(safe-environment-set!
-  rpc-env 'unsubscribe
-  (lambda (room-id)
-    (put! room-id 'frontend-subscribed #f)))
+(define (ipc:subscribe room-id)
+  (assert (symbol? room-id))
+  (cond ((memv room-id (joined-rooms))
+         (put! room-id 'frontend-subscribed #t)
+         (and-let* ((mark (get room-id 'read-marker)))
+              (ipc-send 'read-marker room-id mark)))
+        (else (ipc-info "Unable to subscribe to unknown room: ~a" room-id))))
+(hash-table-set! *ipc-procedures* 'subscribe ipc:subscribe)
 
-(safe-environment-set!
-  rpc-env 'fetch-events
-  (lambda (room-id limit offset)
-    (set! *last-known-limit* limit)
-    (let* ((tl (room-timeline room-id limit: limit offset: offset)))
-      (ipc-send 'bundle-start)
-      (ipc-send 'clear room-id)
-      (ipc-send 'room-name room-id (or (room-display-name (room-context room-id))
-                                       (symbol->string room-id)))
-      (send-timeline-events room-id tl)
-      (when (zero? offset)
-        (for-each
-          (lambda (m) (ipc-send 'message room-id m))
-          (room-temporary-messages room-id)))
-      (ipc-send 'bundle-end))))
+(define (ipc:unsubscribe room-id)
+  (assert (symbol? room-id))
+  (put! room-id 'frontend-subscribed #f))
+(hash-table-set! *ipc-procedures* 'unsubscribe ipc:unsubscribe)
 
-(safe-environment-set!
-  rpc-env 'message:text
-  (lambda (room-id str)
-    (let ((transaction-id (new-transaction-id))
-          (event-contents `((msgtype . "m.text")
-                            (body . ,str))))
-      (add-temporary-message! room-id
-                              transaction-id
-                              event-contents)
-      (defer 'message room-send
-             room-id 'm.room.message
-             transaction-id event-contents))))
+(define (ipc:fetch-events room-id limit offset)
+  (assert (symbol? room-id))
+  (assert (exact-integer? limit))
+  (assert (exact-integer? offset))
+  (set! *last-known-limit* limit)
+  (let* ((tl (room-timeline room-id limit: limit offset: offset)))
+    (ipc-send 'bundle-start)
+    (ipc-send 'clear room-id)
+    (ipc-send 'room-name room-id (or (room-display-name (room-context room-id))
+                                     (symbol->string room-id)))
+    (send-timeline-events room-id tl)
+    (when (zero? offset)
+      (for-each
+        (lambda (m) (ipc-send 'message room-id m))
+        (room-temporary-messages room-id)))
+    (ipc-send 'bundle-end)))
+(hash-table-set! *ipc-procedures* 'fetch-events ipc:fetch-events)
 
-(safe-environment-set!
-  rpc-env 'message:emote
-  (lambda (room-id str)
-    (let ((transaction-id (new-transaction-id))
-          (event-contents `((msgtype . "m.emote")
-                            (body . ,str))))
-      (add-temporary-message! room-id
-                              transaction-id
-                              event-contents)
-      (defer 'message room-send
-             room-id 'm.room.message
-             transaction-id event-contents))))
+(define (ipc:message:text room-id str)
+  (assert (symbol? room-id))
+  (assert (string? str))
+  (let ((transaction-id (new-transaction-id))
+        (event-contents `((msgtype . "m.text")
+                          (body . ,str))))
+    (add-temporary-message! room-id
+                            transaction-id
+                            event-contents)
+    (defer 'message room-send
+           room-id 'm.room.message
+           transaction-id event-contents)))
+(hash-table-set! *ipc-procedures* 'message:text ipc:message:text)
 
-(safe-environment-set!
-  rpc-env 'mark-last-message-as-read
-  (lambda (room-id)
-    (let ((evt-id (mark-last-message-as-read room-id)))
-      (ipc-send 'read-marker room-id (string->symbol evt-id))
-      (ipc-send 'notifications room-id 0 0))))
+(define (ipc:message:emote room-id str)
+  (assert (symbol? room-id))
+  (assert (string? str))
+  (let ((transaction-id (new-transaction-id))
+        (event-contents `((msgtype . "m.emote")
+                          (body . ,str))))
+    (add-temporary-message! room-id
+                            transaction-id
+                            event-contents)
+    (defer 'message room-send
+           room-id 'm.room.message
+           transaction-id event-contents)))
+(hash-table-set! *ipc-procedures* 'message:emote ipc:message:emote)
 
-(safe-environment-set!
-  rpc-env 'login
-  (lambda (server username password)
-    (delete-file* (make-pathname *profile-dir* "credentials"))
-    (delete-file* *state-file*)
-    (init! server)
-    (password-login username password)
-    (ipc-info "Login successful")
-    (save-profile)
-    (restart)))
+(define (ipc:mark-last-message-as-read room-id)
+  (assert (symbol? room-id))
+  (let ((evt-id (mark-last-message-as-read room-id)))
+    (ipc-send 'read-marker room-id (string->symbol evt-id))
+    (ipc-send 'notifications room-id 0 0)))
+(hash-table-set! *ipc-procedures* 'mark-last-message-as-read
+                                  ipc:mark-last-message-as-read)
 
-(safe-environment-set!
-  rpc-env 'join-room
-  (lambda (room)
-    (set! *rooms-invited* (alist-delete! room *rooms-invited*))
-    (defer 'join-room alias-join room '())))
+(define (ipc:login server username password)
+  (assert (string? server))
+  (assert (string? username))
+  (assert (string? password))
+  (delete-file* (make-pathname *profile-dir* "credentials"))
+  (delete-file* *state-file*)
+  (init! server)
+  (password-login username password)
+  (ipc-info "Login successful")
+  (save-profile)
+  (restart))
+(hash-table-set! *ipc-procedures* 'login ipc:login)
 
-(safe-environment-set!
-  rpc-env 'leave-room
-  (lambda (room-id)
-    (defer 'leave-room room-leave room-id '())))
+(define (ipc:join-room room)
+  (assert (string? room))
+  (set! *rooms-invited* (alist-delete! room *rooms-invited*))
+  (defer 'join-room alias-join room '()))
+(hash-table-set! *ipc-procedures* 'join-room ipc:join-room)
+
+(define (ipc:leave-room room-id)
+  (assert (string? room-id))
+  (defer 'leave-room room-leave room-id '()))
+(hash-table-set! *ipc-procedures* 'leave-room ipc:leave-room)
 
 
 ;; Synchronous IPC calls
 
-(safe-environment-set!
-  rpc-env 'query
-  (lambda (query-id what . args)
-    (let ((pred (case what
-                  ((joined-rooms) (lambda () (pair? (joined-rooms))))
-                  (else yes)))
-          (proc (case what
-                  ((find-room) find-room)
-                  ((joined-rooms) joined-rooms)
-                  ((room-members) query-room-members)
-                  ((room-display-name) query-room-display-name)
-                  ((read-marker) read-marker)
-                  (else oops))))
-      (delay-response
-        pred
-        (lambda ()
-          (ipc-send 'response query-id (apply proc args)))))))
+(define (ipc:query query-id what . args)
+  (assert (symbol? what))
+  (let ((pred (case what
+                ((joined-rooms) (lambda () (pair? (joined-rooms))))
+                (else yes)))
+        (proc (case what
+                ((find-room) find-room)
+                ((joined-rooms) joined-rooms)
+                ((room-members) query-room-members)
+                ((room-display-name) query-room-display-name)
+                ((read-marker) read-marker)
+                (else oops))))
+    (delay-response
+      pred
+      (lambda ()
+        (ipc-send 'response query-id (apply proc args))))))
+(hash-table-set! *ipc-procedures* 'query ipc:query)
 
 (define (oops . args)
   (ipc-info "Wrong query! ~s" args)
