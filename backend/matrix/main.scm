@@ -269,9 +269,11 @@
 
 (begin-for-syntax
   (define *ipc-receiver* 'backend)
-  (define *ipc-send-procedure* 'ipc-send))
-
+  (define *ipc-send-procedure* 'ipc-send)
+  (define *ipc-hash-table* '*ipc-procedures*))
 (include-relative "../../ipc.scm")
+
+(define *ipc-procedures* (make-hash-table))
 
 (define (ipc-send exp)
   (info "IPC Sending: ~s" exp)
@@ -303,26 +305,17 @@
 
 ;; ASYNC IPC calls
 
-(define *ipc-procedures* (make-hash-table))
-
-(define (ipc:subscribe room-id)
-  (assert (symbol? room-id))
+(define-ipc-implementation (subscribe room-id)
   (cond ((memv room-id (joined-rooms))
          (put! room-id 'frontend-subscribed #t)
          (and-let* ((mark (get room-id 'read-marker)))
               (ipc:read-marker room-id mark)))
         (else (ipc-info "Unable to subscribe to unknown room: ~a" room-id))))
-(hash-table-set! *ipc-procedures* 'subscribe ipc:subscribe)
 
-(define (ipc:unsubscribe room-id)
-  (assert (symbol? room-id))
+(define-ipc-implementation (unsubscribe room-id)
   (put! room-id 'frontend-subscribed #f))
-(hash-table-set! *ipc-procedures* 'unsubscribe ipc:unsubscribe)
 
-(define (ipc:fetch-events room-id limit offset)
-  (assert (symbol? room-id))
-  (assert (exact-integer? limit))
-  (assert (exact-integer? offset))
+(define-ipc-implementation (fetch-events room-id limit offset)
   (set! *last-known-limit* limit)
   (let* ((tl (room-timeline room-id limit: limit offset: offset)))
     (ipc:bundle-start)
@@ -335,11 +328,8 @@
         (lambda (m) (ipc:message room-id m))
         (room-temporary-messages room-id)))
     (ipc:bundle-end)))
-(hash-table-set! *ipc-procedures* 'fetch-events ipc:fetch-events)
 
-(define (ipc:message:text room-id str)
-  (assert (symbol? room-id))
-  (assert (string? str))
+(define-ipc-implementation (message:text room-id str)
   (let ((transaction-id (new-transaction-id))
         (event-contents `((msgtype . "m.text")
                           (body . ,str))))
@@ -349,11 +339,8 @@
     (defer 'message room-send
            room-id 'm.room.message
            transaction-id event-contents)))
-(hash-table-set! *ipc-procedures* 'message:text ipc:message:text)
 
-(define (ipc:message:emote room-id str)
-  (assert (symbol? room-id))
-  (assert (string? str))
+(define-ipc-implementation (message:emote room-id str)
   (let ((transaction-id (new-transaction-id))
         (event-contents `((msgtype . "m.emote")
                           (body . ,str))))
@@ -363,20 +350,13 @@
     (defer 'message room-send
            room-id 'm.room.message
            transaction-id event-contents)))
-(hash-table-set! *ipc-procedures* 'message:emote ipc:message:emote)
 
-(define (ipc:mark-last-message-as-read room-id)
-  (assert (symbol? room-id))
+(define-ipc-implementation (mark-last-message-as-read room-id)
   (let ((evt-id (mark-last-message-as-read room-id)))
     (ipc:read-marker room-id (string->symbol evt-id))
     (ipc:notifications room-id 0 0)))
-(hash-table-set! *ipc-procedures* 'mark-last-message-as-read
-                                  ipc:mark-last-message-as-read)
 
-(define (ipc:login server username password)
-  (assert (string? server))
-  (assert (string? username))
-  (assert (string? password))
+(define-ipc-implementation (login server username password)
   (delete-file* (make-pathname *profile-dir* "credentials"))
   (delete-file* *state-file*)
   (init! server)
@@ -384,24 +364,18 @@
   (ipc-info "Login successful")
   (save-profile)
   (restart))
-(hash-table-set! *ipc-procedures* 'login ipc:login)
 
-(define (ipc:join-room room)
-  (assert (string? room))
+(define-ipc-implementation (join-room room)
   (set! *rooms-invited* (alist-delete! room *rooms-invited*))
   (defer 'join-room alias-join room '()))
-(hash-table-set! *ipc-procedures* 'join-room ipc:join-room)
 
-(define (ipc:leave-room room-id)
-  (assert (string? room-id))
+(define-ipc-implementation (leave-room room-id)
   (defer 'leave-room room-leave room-id '()))
-(hash-table-set! *ipc-procedures* 'leave-room ipc:leave-room)
 
 
 ;; Synchronous IPC calls
 
-(define (ipc:query query-id what . args)
-  (assert (symbol? what))
+(define-ipc-implementation (query query-id what args)
   (let ((pred (case what
                 ((joined-rooms) (lambda () (pair? (joined-rooms))))
                 (else yes)))
@@ -416,7 +390,6 @@
       pred
       (lambda ()
         (ipc:response query-id (apply proc args))))))
-(hash-table-set! *ipc-procedures* 'query ipc:query)
 
 (define (oops . args)
   (ipc-info "Wrong query! ~s" args)

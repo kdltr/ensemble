@@ -7,7 +7,7 @@
 ;;   (define *ipc-send-procedure* (quote whatever)))
 
 (begin-for-syntax
-  (import srfi-1 srfi-71)
+  (import srfi-1 srfi-69)
   
   (define (type->predicate type)
     (case type
@@ -16,16 +16,8 @@
       (else
         (symbol-append type '?))))
   
-  (define (split-lambda-list l)
-    (let lp ((l l)
-             (regular-args '()))
-      (cond ((null? l)
-             (values (reverse! regular-args) #f))
-            ((eq? '#!rest (car l))
-             (values (reverse! regular-args) (cadr l)))
-            (else
-              (lp (cdr l) (cons (car l) regular-args))))))
-  )
+  ;; name -> (lambda-list type-declaration predicates)
+  (define *ipc-specs* (make-hash-table)))
 
 (define (any? o) #t)
 
@@ -38,18 +30,51 @@
             (cons 'define-ipc-receiver spec)
             (cons 'define-ipc-sender spec))))))
 
-;; TODO
 (define-syntax define-ipc-receiver
   (ir-macro-transformer
     (lambda (exp inject compare)
-      '(void)
-      #;(list 'quote exp))))
+      (let* ((name (strip-syntax (cadr exp)))
+             (typed-args (cddr exp))
+             (arg-names (map (lambda (p) (strip-syntax (car p))) typed-args))
+             (arg-types (map (lambda (p) (strip-syntax (cadr p))) typed-args))
+             (arg-predicates (map type->predicate arg-types)))
+        (hash-table-set! *ipc-specs*
+                         name
+                         (list arg-names
+                               arg-types
+                               arg-predicates))
+        '(void)))))
+
+(define-syntax define-ipc-implementation
+  (ir-macro-transformer
+    (lambda (exp inject compare)
+      (let* ((spec (cadr exp))
+             (name (strip-syntax (car spec)))
+             (args (cdr spec))
+             (body (cddr exp))
+             (proc-name (inject (symbol-append '|ipc-impl:| name)))
+             (spec (hash-table-ref *ipc-specs* name))
+             (types (cadr spec))
+             (predicates (caddr spec)))
+        (assert (equal? (car spec) (map strip-syntax args)))
+        `(begin
+           (: ,proc-name (,@types -> *))
+           (define ,proc-name
+             (lambda ,args
+               ,@(map
+                   (lambda (arg pred)
+                     `(assert (,pred ,arg)))
+                   args
+                   predicates)
+               ,@body))
+           (hash-table-set! ,*ipc-hash-table* ',name ,proc-name))))))
+
 
 (define-syntax define-ipc-sender
   (ir-macro-transformer
     (lambda (exp inject compare)
       (let* ((name (cadr exp))
-             (typed-args typed-rest-arg (split-lambda-list (cddr exp)))
+             (typed-args (cddr exp))
              (args (map car typed-args))
              (types (map cadr typed-args))
              (assertions (map
@@ -58,22 +83,14 @@
                              `(assert (,(type->predicate (strip-syntax type)) ,arg)))
                            args
                            types))
-             (proc-name (inject (symbol-append '|ipc:| (strip-syntax name))))
-             (rest-arg (if typed-rest-arg (car typed-rest-arg) '(quote ())))
-             (rest-type-decl (if typed-rest-arg `(#!rest ,(cadr typed-rest-arg)) '()))
-             (rest-assertion (if typed-rest-arg
-                                 `(assert (,(type->predicate (strip-syntax (cadr typed-rest-arg)))
-                                           ,rest-arg))
-                                 '(void)))
-             (rest-lambda (if typed-rest-arg `(#!rest ,(car typed-rest-arg)) '())))
+             (proc-name (inject (symbol-append '|ipc:| (strip-syntax name)))))
         `(begin
-           (: ,proc-name (,@types ,@rest-type-decl -> *))
+           (: ,proc-name (,@types -> *))
            (define ,proc-name
-             (lambda (,@args ,@rest-lambda)
+             (lambda ,args
                ,@assertions
-               ,rest-assertion
                (,*ipc-send-procedure*
-                 (cons* ',name ,@args ,rest-arg)))))))))
+                 (list ',name ,@args)))))))))
 
 
 ;; Backend -> Frontend
@@ -155,4 +172,4 @@
 (define-ipc-spec backend
   (query (query-id integer)
          (what symbol)
-         #!rest (args *)))
+         (args list)))

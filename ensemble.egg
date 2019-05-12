@@ -57,12 +57,14 @@
               ensemble.libs.nonblocking-ports
               ensemble.libs.concurrency)
             (source-dependencies
+              "ipc.scm"
               "backend/matrix/low-level.scm"
               "backend/matrix/client.scm"))
    ;; Console interface
    (extension ensemble.interface.console
               (source "interface/console/main.scm")
               (source-dependencies
+                "ipc.scm"
                 "interface/console/input.scm")
               (component-dependencies
                 ensemble.libs.debug

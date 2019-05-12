@@ -63,8 +63,11 @@
 
 (begin-for-syntax
   (define *ipc-receiver* 'frontend)
-  (define *ipc-send-procedure* 'ipc-send))
+  (define *ipc-send-procedure* 'ipc-send)
+  (define *ipc-hash-table* '*ipc-procedures*))
 (include-relative "../../ipc.scm")
+
+(define *ipc-procedures* (make-hash-table))
 
 (define (ipc-send exp)
   (info "Sending IPC: ~s" exp)
@@ -73,8 +76,8 @@
 (define *query-number* 0)
 (define *queries* '())
 
-(define (ipc-query . args)
-  (apply ipc:query (inc! *query-number*) args)
+(define (ipc-query what . args)
+  (ipc:query (inc! *query-number*) what args)
   (call/cc
     (lambda (k)
       (push! (cons *query-number* k)
@@ -524,8 +527,6 @@
     (refresh-statuswin)
     (refresh-inputwin)))
 
-(define *ipc-procedures* (make-hash-table))
-
 (define (handle-backend-response msg)
   (info "Recvd from backend: ~s" msg)
   (if (eof-object? msg)
@@ -535,16 +536,12 @@
             (apply procedure (cdr msg))
             (info "unknown message from backend: ~a" msg)))))
 
-(define (ipc:bundle-start)
+(define-ipc-implementation (bundle-start)
   (for-each
     handle-backend-response
     (collect-bundle-messages)))
-(hash-table-set! *ipc-procedures* 'bundle-start ipc:bundle-start)
 
-(define (ipc:notifications room-id new-hls new-notifs)
-  (assert (symbol? room-id))
-  (assert (exact-integer? new-hls))
-  (assert (exact-integer? new-notifs))
+(define-ipc-implementation (notifications room-id new-hls new-notifs)
   (let* ((window (add-room-window room-id))
          (old-hls _ (window-notifications window)))
     (when (> new-hls old-hls)
@@ -552,49 +549,29 @@
     (put! window 'highlights new-hls)
     (put! window 'notifications new-notifs)
     (refresh-statuswin)))
-(hash-table-set! *ipc-procedures* 'notifications ipc:notifications)
 
-(define (ipc:clear room-id)
-  (assert (symbol? room-id))
+(define-ipc-implementation (clear room-id)
   (when (equal? room-id (current-room))
     (werase messageswin)))
-(hash-table-set! *ipc-procedures* 'clear ipc:clear)
 
-(define (ipc:refresh room-id)
-  (assert (symbol? room-id))
+(define-ipc-implementation (refresh room-id)
   (when (equal? room-id (window-room *current-window*))
     (refresh-current-window)))
-(hash-table-set! *ipc-procedures* 'refresh ipc:refresh)
 
-(define (ipc:response id datum)
-  (assert (exact-integer? id))
+(define-ipc-implementation (response id datum)
   (handle-query-response id datum))
-(hash-table-set! *ipc-procedures* 'response ipc:response)
 
-(define (ipc:read-marker room-id event-id)
-  (assert (symbol? room-id))
-  (assert (symbol? event-id))
+(define-ipc-implementation (read-marker room-id event-id)
   (when (equal? room-id (current-room))
     (set! *read-marker* (symbol->string event-id))
     (refresh-current-window)))
-(hash-table-set! *ipc-procedures* 'read-marker ipc:read-marker)
 
-(define (ipc:room-name room-id room-name)
-  (assert (symbol? room-id))
-  (assert (string? room-name))
+(define-ipc-implementation (room-name room-id room-name)
   (when (equal? room-id (current-room))
     (set! *current-room-name* room-name)
     (refresh-statuswin)))
-(hash-table-set! *ipc-procedures* 'room-name ipc:room-name)
 
-(define (ipc:message room-id message)
-  (assert (symbol? room-id))
-  (assert (list? message))
-  (for-each
-    (lambda (o)
-      (assert (pair? o))
-      (assert (symbol? (car o))))
-    message)
+(define-ipc-implementation (message room-id message)
   (when (equal? room-id (current-room))
     (maybe-newline)
     (when (alist-ref 'highlight message)
@@ -608,12 +585,9 @@
     (when (equal? (alist-ref 'event_id message)
                   *read-marker*)
       (wprintw messageswin "~A" (make-string cols #\-)))))
-(hash-table-set! *ipc-procedures* 'message ipc:message)
 
-(define (ipc:info message)
-  (assert (string? message))
+(define-ipc-implementation (info message)
   (special-window-write 'backend "~a" message))
-(hash-table-set! *ipc-procedures* 'info ipc:info)
 
 
 (define (handle-backend-disconnection worker)

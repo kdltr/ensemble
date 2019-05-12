@@ -1,4 +1,7 @@
 chicken-install -v
+gg -E '(TODO|FIXME|XXX)'
+
+ensemble.egg
 
 backend/matrix/main.scm
 backend/matrix/client.scm
@@ -6,3 +9,5 @@ backend/matrix/low-level.scm
 
 interface/console/main.scm
 interface/console/input.scm
+
+ipc.scm
