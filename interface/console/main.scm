@@ -22,6 +22,8 @@
   (chicken process signal)
   (chicken repl)
   (chicken sort)
+  (chicken syntax)
+  (chicken type)
   srfi-1
   srfi-18
   srfi-69
@@ -59,16 +61,20 @@
   (gochan-send *user-channel* (get-input))
   (user-read-loop))
 
-(define (ipc-send . args)
-  (info "Sending IPC: ~s" args)
-  (gochan-send (worker-outgoing worker) args))
+(begin-for-syntax
+  (define *ipc-receiver* 'frontend)
+  (define *ipc-send-procedure* 'ipc-send))
+(include-relative "../../ipc.scm")
 
+(define (ipc-send exp)
+  (info "Sending IPC: ~s" exp)
+  (gochan-send (worker-outgoing worker) exp))
 
 (define *query-number* 0)
 (define *queries* '())
 
 (define (ipc-query . args)
-  (apply ipc-send 'query (inc! *query-number*) args)
+  (apply ipc:query (inc! *query-number*) args)
   (call/cc
     (lambda (k)
       (push! (cons *query-number* k)
@@ -234,9 +240,9 @@
         (room-id (window-room id)))
     (cond (room-id
            (when current-room-id
-             (ipc-send 'unsubscribe current-room-id))
+             (ipc:unsubscribe current-room-id))
            (set! *current-window* id)
-           (ipc-send 'subscribe room-id)
+           (ipc:subscribe room-id)
            (refresh-statuswin)
            (refresh-current-window))
           (else
@@ -250,7 +256,7 @@
 
 (define (refresh-room-window id)
   (let ((room-id (window-room id)))
-    (ipc-send 'fetch-events room-id rows
+    (ipc:fetch-events room-id rows
             (room-offset room-id))))
 
 (define (refresh-special-window id)
@@ -620,3 +626,4 @@
         (cons msg (collect-bundle-messages)))))
 
 ) ;; tui module
+

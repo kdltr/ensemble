@@ -357,7 +357,7 @@
                        (let ((id (string->symbol (mref '(content event_id) evt))))
                          (read-marker-set! room-id id)
                          (when (get room-id 'frontend-subscribed)
-                           (ipc-send 'read-marker room-id id)))))
+                           (ipc:read-marker room-id id)))))
                    events))
 
 (define (handle-sync batch)
@@ -401,7 +401,7 @@
             (refresh? (remove-temporary-messages! room-id (vector->list events))))
         (when subscribed?
           (if refresh?
-              (ipc-send 'refresh room-id)
+              (ipc:refresh room-id)
               (send-timeline-events room-id timeline-additions)))))
 
     (manage-account-data room-id account-data)
@@ -412,16 +412,16 @@
     (send-notifications room-id)))
 
 (define (send-notifications room-id)
-  (ipc-send 'notifications room-id
-            (inexact->exact (round (or (get room-id 'highlights) 0)))
-            (inexact->exact (round (or (get room-id 'notifications) 0)))))
+  (ipc:notifications room-id
+                     (inexact->exact (round (or (get room-id 'highlights) 0)))
+                     (inexact->exact (round (or (get room-id 'notifications) 0)))))
 
 (define (send-timeline-events room-id tl)
   (for-each
     (lambda (m)
       (when (hole-event? m)
         (request-hole-messages room-id m *last-known-limit*))
-      (ipc-send 'message room-id (cleanup-event m)))
+      (ipc:message room-id (cleanup-event m)))
     (reverse tl)))
 
 
@@ -480,7 +480,7 @@
     (put! room-id 'timeline (append after-hole new-timeline))
     )
   (set! *requested-holes* (delete! hole-evt *requested-holes*))
-  (ipc-send 'refresh room-id))
+  (ipc:refresh room-id))
 
 (define (filter-out-known-events evts ref-evt)
   (take-while (lambda (o) (not (equal? ref-evt o))) evts))

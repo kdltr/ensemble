@@ -152,14 +152,14 @@
   (cond ((or (string=? "" input-string)
              (string-every char-set:white-space input-string))
          (cond ((room-window? *current-window*)
-                (ipc-send 'mark-last-message-as-read (current-room)))
+                (ipc:mark-last-message-as-read (current-room)))
                ((special-window? *current-window*)
                 (put! *current-window* 'notifications 0)
                 (refresh-statuswin))))
         ((char=? (string-ref input-string 0) #\/)
          (handle-command input-string))
         ((room-window? *current-window*)
-         (ipc-send 'message:text (current-room) input-string)))
+         (ipc:message:text (current-room) input-string)))
   (set! input-string "")
   (move-cursor 'left))
 
@@ -254,7 +254,7 @@
     (if (= new-offset 0)
         (begin
           (room-offset-delete! (current-room))
-          (ipc-send 'subscribe (current-room)))
+          (ipc:subscribe (current-room)))
         (room-offset-set! (current-room) (max 0 new-offset)))
     (refresh-current-window)))
 
@@ -263,7 +263,7 @@
   (let* ((current-offset (room-offset (current-room)))
          (new-offset (add1 current-offset)))
     (room-offset-set! (current-room) new-offset)
-    (ipc-send 'unsubscribe (current-room))
+    (ipc:unsubscribe (current-room))
     (refresh-current-window)))
 
 
@@ -308,10 +308,10 @@
 
 (define-command say joined args
   (when (room-window? *current-window*)
-    (ipc-send 'message:text (current-room) joined)))
+    (ipc:message:text (current-room) joined)))
 
 (define-command me joined args
-  (ipc-send 'message:emote (current-room) joined))
+  (ipc:message:emote (current-room) joined))
 
 (define-command list joined args
   (special-window-write 'ensemble "beginning of list")
@@ -341,15 +341,16 @@
 
 (define-command login joined args
   (let ((server username password (run-login-prompt)))
-    (ipc-send 'login server username password)))
+    (ipc:login server username password)))
 
 (define-command join joined args
-  (ipc-send 'join-room joined))
+  (ipc:join-room joined))
 
 (define-command leave joined args
   (if (null? args)
-      (ipc-send 'leave-room (window-room *current-window*))
-      (ipc-send 'leave-room joined)))
+      (ipc:leave-room (window-room *current-window*))
+      (ipc:leave-room joined)))
 
 (define-command (exit quit) joined args
   (exit))
+

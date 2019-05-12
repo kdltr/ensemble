@@ -21,8 +21,10 @@
   (chicken process)
   (chicken process-context)
   (chicken process-context posix)
+  (chicken syntax)
   (chicken time)
   (chicken time posix)
+  (chicken type)
   miscmacros
   srfi-1
   srfi-18
@@ -265,17 +267,23 @@
 ;; IPC definitions
 ;; ===============
 
-(define (ipc-send . exps)
-  (info "IPC Sending: ~s" exps)
-  (write exps)
+(begin-for-syntax
+  (define *ipc-receiver* 'backend)
+  (define *ipc-send-procedure* 'ipc-send))
+
+(include-relative "../../ipc.scm")
+
+(define (ipc-send exp)
+  (info "IPC Sending: ~s" exp)
+  (write exp)
   (newline)
   (flush-output))
 
 (define (ipc-info msg . rest)
-  (ipc-send 'info (sprintf "[~a] ~?"
-                           (time->string (seconds->local-time)
-                                         "%d/%m %H:%M")
-                           msg rest)))
+  (ipc:info (sprintf "[~a] ~?"
+                     (time->string (seconds->local-time)
+                                   "%d/%m %H:%M")
+                     msg rest)))
 
 (define *delayed-responses* '())
 (define +delay-marker+ (gensym 'delay))
@@ -302,7 +310,7 @@
   (cond ((memv room-id (joined-rooms))
          (put! room-id 'frontend-subscribed #t)
          (and-let* ((mark (get room-id 'read-marker)))
-              (ipc-send 'read-marker room-id mark)))
+              (ipc:read-marker room-id mark)))
         (else (ipc-info "Unable to subscribe to unknown room: ~a" room-id))))
 (hash-table-set! *ipc-procedures* 'subscribe ipc:subscribe)
 
@@ -317,16 +325,16 @@
   (assert (exact-integer? offset))
   (set! *last-known-limit* limit)
   (let* ((tl (room-timeline room-id limit: limit offset: offset)))
-    (ipc-send 'bundle-start)
-    (ipc-send 'clear room-id)
-    (ipc-send 'room-name room-id (or (room-display-name (room-context room-id))
+    (ipc:bundle-start)
+    (ipc:clear room-id)
+    (ipc:room-name room-id (or (room-display-name (room-context room-id))
                                      (symbol->string room-id)))
     (send-timeline-events room-id tl)
     (when (zero? offset)
       (for-each
-        (lambda (m) (ipc-send 'message room-id m))
+        (lambda (m) (ipc:message room-id m))
         (room-temporary-messages room-id)))
-    (ipc-send 'bundle-end)))
+    (ipc:bundle-end)))
 (hash-table-set! *ipc-procedures* 'fetch-events ipc:fetch-events)
 
 (define (ipc:message:text room-id str)
@@ -360,8 +368,8 @@
 (define (ipc:mark-last-message-as-read room-id)
   (assert (symbol? room-id))
   (let ((evt-id (mark-last-message-as-read room-id)))
-    (ipc-send 'read-marker room-id (string->symbol evt-id))
-    (ipc-send 'notifications room-id 0 0)))
+    (ipc:read-marker room-id (string->symbol evt-id))
+    (ipc:notifications room-id 0 0)))
 (hash-table-set! *ipc-procedures* 'mark-last-message-as-read
                                   ipc:mark-last-message-as-read)
 
@@ -407,7 +415,7 @@
     (delay-response
       pred
       (lambda ()
-        (ipc-send 'response query-id (apply proc args))))))
+        (ipc:response query-id (apply proc args))))))
 (hash-table-set! *ipc-procedures* 'query ipc:query)
 
 (define (oops . args)
@@ -474,7 +482,7 @@
       (append! (or (get room-id 'temporary-messages) '())
                (list (cons txid fake-event))))
     (when (get room-id 'frontend-subscribed)
-      (ipc-send 'message room-id fake-event))))
+      (ipc:message room-id fake-event))))
 
 (define (remove-temporary-messages! room-id events)
   (let* ((txids-to-remove (filter-map event-transaction-id events))
