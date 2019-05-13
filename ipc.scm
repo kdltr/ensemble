@@ -114,10 +114,6 @@
   (refresh (room-id symbol)))
 
 (define-ipc-spec frontend
-  (response (id integer)
-            (datum *)))
-
-(define-ipc-spec frontend
   (read-marker (room-id symbol)
                (event-id symbol)))
 
@@ -172,8 +168,3 @@
 
 (define-ipc-spec backend
   (leave-room (room-id string)))
-
-(define-ipc-spec backend
-  (query (query-id integer)
-         (what symbol)
-         (args list)))

@@ -73,24 +73,6 @@
   (info "Sending IPC: ~s" exp)
   (gochan-send (worker-outgoing worker) exp))
 
-(define *query-number* 0)
-(define *queries* '())
-
-(define (ipc-query what . args)
-  (ipc:query (inc! *query-number*) what args)
-  (call/cc
-    (lambda (k)
-      (push! (cons *query-number* k)
-             *queries*)
-      (main-loop))))
-
-(define (handle-query-response id datum)
-  (info "Queries waiting: ~a" (length *queries*))
-  (and-let* ((pair (assoc id *queries*))
-             (task (cdr pair)))
-       (set! *queries* (delete! pair *queries*))
-       (task datum)))
-
 (define *read-marker* #f)
 
 (define *rooms-offset* '())
@@ -469,8 +451,6 @@
             (process-execute* +backend-executable+
                               (cons "default" (cdr (argv))))))))
   (thread-start! user-read-loop)
-  (let ((joined-rooms (ipc-query 'joined-rooms)))
-    (for-each add-room-window joined-rooms))
   (main-loop))
 
 (define (load-config)
@@ -556,9 +536,6 @@
 (define-ipc-implementation (refresh room-id)
   (when (equal? room-id (window-room *current-window*))
     (refresh-current-window)))
-
-(define-ipc-implementation (response id datum)
-  (handle-query-response id datum))
 
 (define-ipc-implementation (read-marker room-id event-id)
   (when (equal? room-id (current-room))

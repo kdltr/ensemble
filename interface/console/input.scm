@@ -324,20 +324,32 @@
   (special-window-write 'ensemble "end of list"))
 
 (define-command (find f) joined args
-  (let ((matching-rooms (ipc-query 'find-room joined)))
-    (cond ((null? matching-rooms))
-          ((null? (cdr matching-rooms))
-           (switch-window (window-for-room (car matching-rooms))))
+  (let ((matching-windows (find-room joined)))
+    (cond ((null? matching-windows))
+          ((null? (cdr matching-windows))
+           (switch-window (car matching-windows)))
           (else
             (switch-window 'ensemble)
             (special-window-write 'ensemble "Rooms matching '~a'" joined)
             (for-each
-              (lambda (room-id)
+              (lambda (win)
                 (special-window-write
                   'ensemble "~a: ~a"
-                  (window-for-room room-id) (get room-id 'name)))
-              matching-rooms)
+                  win (get (get win 'room-id) 'name)))
+              matching-windows)
             (special-window-write 'ensemble "end of /find results")))))
+
+(define (find-room regex)
+  (define (searched-string r)
+    (or (get r 'name)
+        ;; TODO
+        #;(get r 'aliases)
+        (string-join (get r 'members))
+        ""))
+  (filter (lambda (win)
+            (irregex-search (irregex regex 'i)
+                            (searched-string (get win 'room-id))))
+          *room-windows*))
 
 (define-command login joined args
   (let ((server username password (run-login-prompt)))

@@ -207,7 +207,6 @@
       ((hole-messages) (apply fill-hole datum))
       (else  (info "Unknown defered procedure: ~a ~s~%" who datum))
       ))
-  (flush-delayed-responses)
   (main-loop))
 
 (define (thread-join-protected! thread)
@@ -293,22 +292,6 @@
                                    "%d/%m %H:%M")
                      msg rest)))
 
-(define *delayed-responses* '())
-(define +delay-marker+ (gensym 'delay))
-
-(define (delay-response pred thunk)
-  (push! (cons pred thunk) *delayed-responses*))
-
-(define (flush-delayed-responses)
-  (info "Number of delayed responses: ~a" (length *delayed-responses*))
-  (set! *delayed-responses*
-    (fold (lambda (delayed rest)
-            (if ((car delayed))
-                (begin ((cdr delayed)) rest)
-                (cons delayed rest)))
-          '()
-          *delayed-responses*)))
-
 ;; ASYNC IPC calls
 
 (define-ipc-implementation (subscribe room-id)
@@ -377,46 +360,6 @@
 
 (define-ipc-implementation (leave-room room-id)
   (defer 'leave-room room-leave room-id '()))
-
-
-;; Synchronous IPC calls
-
-(define-ipc-implementation (query query-id what args)
-  (let ((pred (case what
-                ((joined-rooms) (lambda () (pair? (joined-rooms))))
-                (else yes)))
-        (proc (case what
-                ((find-room) find-room)
-                ((joined-rooms) joined-rooms)
-                (else oops))))
-    (delay-response
-      pred
-      (lambda ()
-        (ipc:response query-id (apply proc args))))))
-
-(define (oops . args)
-  (ipc-info "Wrong query! ~s" args)
-  'oops)
-
-(define (yes) #t)
-
-(define (find-room regex)
-  (define (searched-string ctx)
-    (or (room-name ctx)
-        (json-true? (mref '(("" . m.room.canonical_alias) alias) ctx))
-        (and-let* ((v (json-true? (mref '(("" . m.room.aliases) aliases) ctx))))
-             (vector-ref v 0))
-        (string-join
-         (filter-map (lambda (p)
-                       (and (equal? (cdar p) 'm.room.member)
-                            (or (member-displayname (caar p) ctx)
-                                (caar p))))
-                     ctx))
-        ""))
-  (filter (lambda (room-id)
-            (irregex-search (irregex regex 'i)
-                            (searched-string (room-context room-id))))
-          (joined-rooms)))
 
 
 ;; Temporary messages
