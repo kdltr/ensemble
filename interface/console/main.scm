@@ -241,12 +241,16 @@
 
 (define (refresh-room-window id)
   (let* ((room-id (window-room id))
-         (read-marker (get room-id 'read-marker)))
+         (read-marker (get room-id 'read-marker))
+         (tl (or (get room-id 'timeline) '()))
+         (tl-len (length tl)))
     (werase messageswin)
     (for-each
       (lambda (m)
         (display-message m read-marker))
-      (or (get room-id 'timeline) '()))))
+      (if (room-offset room-id)
+          (drop-right tl (room-offset room-id))
+          tl))))
 
 (define (display-message message read-marker)
     (maybe-newline)
