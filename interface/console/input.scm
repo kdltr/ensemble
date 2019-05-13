@@ -122,7 +122,7 @@
 
 (define-key #\tab
   (unless (or (special-window? *current-window*) (equal? input-string ""))
-    (let* ((members-names (ipc-query 'room-members (current-room)))
+    (let* ((members-names (get (current-room) 'members))
            (prefix (substring input-string 0 cursor-pos))
            (candidate (find (completion-candidate-checker prefix) members-names)))
       (when candidate
@@ -319,7 +319,7 @@
     (lambda (window)
       (special-window-write
         'ensemble "~a: ~a"
-         window (ipc-query 'room-display-name (window-room window))))
+         window (get (window-room window) 'name)))
     *room-windows*)
   (special-window-write 'ensemble "end of list"))
 
@@ -335,7 +335,7 @@
               (lambda (room-id)
                 (special-window-write
                   'ensemble "~a: ~a"
-                  (window-for-room room-id) (ipc-query 'room-display-name room-id)))
+                  (window-for-room room-id) (get room-id 'name)))
               matching-rooms)
             (special-window-write 'ensemble "end of /find results")))))
 

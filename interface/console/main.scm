@@ -107,7 +107,6 @@
 
 ;; except for a special frontend window and special backend/profile windows
 
-(define *current-room-name* "")
 (define *current-window* 'ensemble)
 (define *special-windows* '(ensemble backend))
 (define *room-windows* '())
@@ -148,7 +147,7 @@
 (define (current-window-name)
   (if (special-window? *current-window*)
       (symbol->string *current-window*)
-      *current-room-name*))
+      (get (current-room) 'name)))
 
 (define (special-window-log win)
   (or (get win 'log) '()))
@@ -567,9 +566,11 @@
     (refresh-current-window)))
 
 (define-ipc-implementation (room-name room-id room-name)
-  (when (equal? room-id (current-room))
-    (set! *current-room-name* room-name)
-    (refresh-statuswin)))
+  (put! room-id 'name room-name)
+  (refresh-statuswin))
+
+(define-ipc-implementation (room-members room-id members)
+  (put! room-id 'members members))
 
 (define-ipc-implementation (message room-id message)
   (when (equal? room-id (current-room))

@@ -126,6 +126,10 @@
              (room-name string)))
 
 (define-ipc-spec frontend
+  (room-members (room-id symbol)
+                (members list)))
+
+(define-ipc-spec frontend
   (message (room-id symbol)
            (message pair)))
 

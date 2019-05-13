@@ -183,7 +183,13 @@
       (main-loop))
     (load-profile))
   (load-state)
-  (for-each send-notifications (joined-rooms))
+  (for-each
+    (lambda (r)
+      (send-notifications r)
+      (ipc:room-name r (or (room-display-name (room-context r))
+                           (symbol->string r)))
+      (ipc:room-members r (room-member-names (room-context r))))
+    (joined-rooms))
   (ipc-info "Synchronizing…")
   (defer 'initial-sync sync since: *next-batch*))
 
@@ -321,7 +327,7 @@
     (ipc:bundle-start)
     (ipc:clear room-id)
     (ipc:room-name room-id (or (room-display-name (room-context room-id))
-                                     (symbol->string room-id)))
+                               (symbol->string room-id)))
     (send-timeline-events room-id tl)
     (when (zero? offset)
       (for-each
@@ -382,9 +388,6 @@
         (proc (case what
                 ((find-room) find-room)
                 ((joined-rooms) joined-rooms)
-                ((room-members) query-room-members)
-                ((room-display-name) query-room-display-name)
-                ((read-marker) read-marker)
                 (else oops))))
     (delay-response
       pred
@@ -414,23 +417,6 @@
             (irregex-search (irregex regex 'i)
                             (searched-string (room-context room-id))))
           (joined-rooms)))
-
-(define (query-room-members id)
-  (let* ((ctx (room-context id))
-         (members (room-members ctx)))
-    (map
-      (lambda (m)
-        (or (json-true? (mref '(displayname) m))
-            (caar m)))
-      members)))
-
-(define (query-room-display-name id)
-  (or (room-display-name (room-context id))
-      (symbol->string id)))
-
-(define (read-marker id)
-  (let ((marker (read-marker-ref id)))
-    (and marker (symbol->string marker))))
 
 
 ;; Temporary messages

@@ -187,6 +187,13 @@
                            (equal? "join" (alist-ref 'membership (cdr p)))))
             ctx))
 
+(define (room-member-names ctx)
+  (let ((members (room-members ctx)))
+    (map
+      (lambda (m)
+        (or (json-true? (mref '(displayname) m))
+            (caar m)))
+      members)))
 
 
 ;; Events printers
@@ -394,6 +401,12 @@
                     (punch-hole prev-batch state)
                     values))
        '() (room-context room-id))
+      (unless (equal? (room-display-name (room-context room-id))
+                      (room-display-name new-state))
+        (ipc:room-name room-id (room-display-name new-state)))
+      (unless (equal? (room-member-names (room-context room-id))
+                      (room-member-names new-state))
+        (ipc:room-members room-id (room-member-names new-state)))
       (put! room-id 'timeline
             (append timeline-additions old-timeline))
       (put! room-id 'bottom-state new-state)
