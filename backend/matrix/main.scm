@@ -183,13 +183,18 @@
       (main-loop))
     (load-profile))
   (load-state)
+  (ipc:bundle-start)
   (for-each
     (lambda (r)
       (send-notifications r)
+      (and-let* ((mark (get r 'read-marker)))
+           (ipc:read-marker r mark))
       (ipc:room-name r (or (room-display-name (room-context r))
                            (symbol->string r)))
-      (ipc:room-members r (room-member-names (room-context r))))
+      (ipc:room-members r (room-member-names (room-context r)))
+      (send-timeline-events r (room-timeline r limit: 10)))
     (joined-rooms))
+  (ipc:bundle-end)
   (ipc-info "Synchronizing…")
   (defer 'initial-sync sync since: *next-batch*))
 
@@ -292,32 +297,6 @@
                                    "%d/%m %H:%M")
                      msg rest)))
 
-;; ASYNC IPC calls
-
-(define-ipc-implementation (subscribe room-id)
-  (cond ((memv room-id (joined-rooms))
-         (put! room-id 'frontend-subscribed #t)
-         (and-let* ((mark (get room-id 'read-marker)))
-              (ipc:read-marker room-id mark)))
-        (else (ipc-info "Unable to subscribe to unknown room: ~a" room-id))))
-
-(define-ipc-implementation (unsubscribe room-id)
-  (put! room-id 'frontend-subscribed #f))
-
-(define-ipc-implementation (fetch-events room-id limit offset)
-  (set! *last-known-limit* limit)
-  (let* ((tl (room-timeline room-id limit: limit offset: offset)))
-    (ipc:bundle-start)
-    (ipc:clear room-id)
-    (ipc:room-name room-id (or (room-display-name (room-context room-id))
-                               (symbol->string room-id)))
-    (send-timeline-events room-id tl)
-    (when (zero? offset)
-      (for-each
-        (lambda (m) (ipc:message room-id m))
-        (room-temporary-messages room-id)))
-    (ipc:bundle-end)))
-
 (define-ipc-implementation (message:text room-id str)
   (let ((transaction-id (new-transaction-id))
         (event-contents `((msgtype . "m.text")
@@ -344,6 +323,24 @@
   (let ((evt-id (mark-last-message-as-read room-id)))
     (ipc:read-marker room-id (string->symbol evt-id))
     (ipc:notifications room-id 0 0)))
+
+(define-ipc-implementation (get-messages-before room-id event-id count)
+  (let* ((tl (room-timeline room-id))
+         (event-id (symbol->string event-id))
+         (events-before (drop-while (lambda (evt)
+                                      (not (equal? event-id (mref '(event_id) evt))))
+                                    tl))
+         (len (length events-before))
+         (events-to-send (cond ((zero? len) '())
+                               ((<= len count)
+                                (cdr events-before))
+                               (else
+                                 (take (cdr events-before) (- len count))))))
+    (let lp ((evts events-to-send)
+             (last-event-id (string->symbol event-id)))
+      (unless (null? evts)
+        (ipc:message-before room-id last-event-id (car evts))
+        (lp (cdr evts) (string->symbol (mref '(event_id) (car evts))))))))
 
 (define-ipc-implementation (login server username password)
   (delete-file* (make-pathname *profile-dir* "credentials"))
@@ -383,8 +380,7 @@
     (put! room-id 'temporary-messages
       (append! (or (get room-id 'temporary-messages) '())
                (list (cons txid fake-event))))
-    (when (get room-id 'frontend-subscribed)
-      (ipc:message room-id fake-event))))
+    (ipc:message room-id fake-event)))
 
 (define (remove-temporary-messages! room-id events)
   (let* ((txids-to-remove (filter-map event-transaction-id events))
@@ -393,7 +389,10 @@
                             old-temps)))
     (info "removing temps: ~s" txids-to-remove)
     (put! room-id 'temporary-messages new-temps)
-    (not (equal? old-temps new-temps))))
+    (for-each
+      (lambda (txid)
+        (ipc:remove room-id (string->symbol (string-append "$fake-" txid))))
+      txids-to-remove)))
 
 
 ;; Startup

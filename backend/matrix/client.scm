@@ -401,6 +401,7 @@
                     (punch-hole prev-batch state)
                     values))
        '() (room-context room-id))
+      (ipc:bundle-start)
       (unless (equal? (room-display-name (room-context room-id))
                       (room-display-name new-state))
         (ipc:room-name room-id (room-display-name new-state)))
@@ -410,12 +411,9 @@
       (put! room-id 'timeline
             (append timeline-additions old-timeline))
       (put! room-id 'bottom-state new-state)
-      (let ((subscribed? (get room-id 'frontend-subscribed))
-            (refresh? (remove-temporary-messages! room-id (vector->list events))))
-        (when subscribed?
-          (if refresh?
-              (ipc:refresh room-id)
-              (send-timeline-events room-id timeline-additions)))))
+      (remove-temporary-messages! room-id (vector->list events))
+      (send-timeline-events room-id timeline-additions)
+      (ipc:bundle-end))
 
     (manage-account-data room-id account-data)
     (when highlights
@@ -432,7 +430,8 @@
 (define (send-timeline-events room-id tl)
   (for-each
     (lambda (m)
-      (when (hole-event? m)
+      ;; TODO reintroduce
+      #;(when (hole-event? m)
         (request-hole-messages room-id m *last-known-limit*))
       (ipc:message room-id (cleanup-event m)))
     (reverse tl)))
@@ -492,8 +491,7 @@
     ;; FIXME the state handling is wrong (have to rewind with prev_content)
     (put! room-id 'timeline (append after-hole new-timeline))
     )
-  (set! *requested-holes* (delete! hole-evt *requested-holes*))
-  (ipc:refresh room-id))
+  (set! *requested-holes* (delete! hole-evt *requested-holes*)))
 
 (define (filter-out-known-events evts ref-evt)
   (take-while (lambda (o) (not (equal? ref-evt o))) evts))

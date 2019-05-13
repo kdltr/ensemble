@@ -11,3 +11,5 @@ interface/console/main.scm
 interface/console/input.scm
 
 ipc.scm
+
+Reintroduce hole filling

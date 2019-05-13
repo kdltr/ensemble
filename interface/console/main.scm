@@ -73,8 +73,6 @@
   (info "Sending IPC: ~s" exp)
   (gochan-send (worker-outgoing worker) exp))
 
-(define *read-marker* #f)
-
 (define *rooms-offset* '())
 
 
@@ -223,10 +221,13 @@
   (let ((current-room-id (window-room *current-window*))
         (room-id (window-room id)))
     (cond (room-id
-           (when current-room-id
-             (ipc:unsubscribe current-room-id))
            (set! *current-window* id)
-           (ipc:subscribe room-id)
+           (let* ((tl (or (get room-id 'timeline) '()))
+                  (tl-len (length tl)))
+             (when (< tl-len rows)
+               (ipc:get-messages-before room-id
+                                        (string->symbol (alist-ref 'event_id (car tl)))
+                                        (- rows tl-len))))
            (refresh-statuswin)
            (refresh-current-window))
           (else
@@ -239,12 +240,30 @@
           (refresh-room-window *current-window*))))
 
 (define (refresh-room-window id)
-  (let ((room-id (window-room id)))
-    (ipc:fetch-events room-id rows
-            (room-offset room-id))))
+  (let* ((room-id (window-room id))
+         (read-marker (get room-id 'read-marker)))
+    (werase messageswin)
+    (for-each
+      (lambda (m)
+        (display-message m read-marker))
+      (or (get room-id 'timeline) '()))))
+
+(define (display-message message read-marker)
+    (maybe-newline)
+    (when (alist-ref 'highlight message)
+      (wcolor_set messageswin MESSAGE_HIGHLIGHT_PAIR #f))
+    (when (alist-ref 'lowlight message)
+      (wattrset messageswin MESSAGE_LOWLIGHT_ATTRS))
+    (wprintw messageswin "~A"
+             (alist-ref 'formated message))
+    (wcolor_set messageswin 0 #f)
+    (wattrset messageswin 0)
+    (when (equal? (alist-ref 'event_id message)
+                  read-marker)
+      (wprintw messageswin "~A" (make-string cols #\-))))
 
 (define (refresh-special-window id)
-  (wclear messageswin)
+  (werase messageswin)
   (for-each
     (lambda (str)
       (maybe-newline)
@@ -529,17 +548,9 @@
     (put! window 'notifications new-notifs)
     (refresh-statuswin)))
 
-(define-ipc-implementation (clear room-id)
-  (when (equal? room-id (current-room))
-    (werase messageswin)))
-
-(define-ipc-implementation (refresh room-id)
-  (when (equal? room-id (window-room *current-window*))
-    (refresh-current-window)))
-
 (define-ipc-implementation (read-marker room-id event-id)
+  (put! room-id 'read-marker (symbol->string event-id))
   (when (equal? room-id (current-room))
-    (set! *read-marker* (symbol->string event-id))
     (refresh-current-window)))
 
 (define-ipc-implementation (room-name room-id room-name)
@@ -550,19 +561,33 @@
   (put! room-id 'members members))
 
 (define-ipc-implementation (message room-id message)
+  (put! room-id 'timeline
+        (append! (or (get room-id 'timeline) '())
+                 (list message)))
   (when (equal? room-id (current-room))
-    (maybe-newline)
-    (when (alist-ref 'highlight message)
-      (wcolor_set messageswin MESSAGE_HIGHLIGHT_PAIR #f))
-    (when (alist-ref 'lowlight message)
-      (wattrset messageswin MESSAGE_LOWLIGHT_ATTRS))
-    (wprintw messageswin "~A"
-             (alist-ref 'formated message))
-    (wcolor_set messageswin 0 #f)
-    (wattrset messageswin 0)
-    (when (equal? (alist-ref 'event_id message)
-                  *read-marker*)
-      (wprintw messageswin "~A" (make-string cols #\-)))))
+    (display-message message (get room-id 'read-marker))))
+
+(define-ipc-implementation (message-before room-id event-id message)
+  (let* ((event-id (symbol->string event-id))
+         (tl (or (get room-id 'timeline) '()))
+         (target-pair (find-tail (lambda (evt)
+                                   (equal? (alist-ref 'event_id evt)
+                                           event-id))
+                                 tl)))
+    (if target-pair
+        (let ((target-event (car target-pair)))
+          (set-car! target-pair message)
+          (set-cdr! target-pair (cons target-event (cdr target-pair)))
+          (refresh-current-window))
+        (special-window-write 'ensemble "Could not find target event '~a'" event-id))))
+
+(define-ipc-implementation (remove room-id event-id)
+  (let ((event-id (symbol->string event-id)))
+    (put! room-id 'timeline
+          (remove! (lambda (msg)
+                     (equal? event-id (alist-ref 'event_id msg)))
+                   (or (get room-id 'timeline) '()))))
+  (refresh-current-window))
 
 (define-ipc-implementation (info message)
   (special-window-write 'backend "~a" message))

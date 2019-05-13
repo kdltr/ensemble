@@ -252,9 +252,7 @@
   (let* ((current-offset (room-offset (current-room)))
          (new-offset (sub1 current-offset)))
     (if (= new-offset 0)
-        (begin
-          (room-offset-delete! (current-room))
-          (ipc:subscribe (current-room)))
+        (room-offset-delete! (current-room))
         (room-offset-set! (current-room) (max 0 new-offset)))
     (refresh-current-window)))
 
@@ -263,7 +261,6 @@
   (let* ((current-offset (room-offset (current-room)))
          (new-offset (add1 current-offset)))
     (room-offset-set! (current-room) new-offset)
-    (ipc:unsubscribe (current-room))
     (refresh-current-window)))
 
 
@@ -365,4 +362,3 @@
 
 (define-command (exit quit) joined args
   (exit))
-

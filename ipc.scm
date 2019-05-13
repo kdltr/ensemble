@@ -108,12 +108,6 @@
                  (new-notifs integer)))
 
 (define-ipc-spec frontend
-  (clear (room-id symbol)))
-
-(define-ipc-spec frontend
-  (refresh (room-id symbol)))
-
-(define-ipc-spec frontend
   (read-marker (room-id symbol)
                (event-id symbol)))
 
@@ -127,7 +121,16 @@
 
 (define-ipc-spec frontend
   (message (room-id symbol)
-           (message pair)))
+           (message list)))
+
+(define-ipc-spec frontend
+  (message-before (room-id symbol)
+                  (event-id symbol)
+                  (message list)))
+
+(define-ipc-spec frontend
+  (remove (room-id symbol)
+          (event-id symbol)))
 
 (define-ipc-spec frontend
   (info (message string)))
@@ -135,17 +138,6 @@
 
 ;; Frontend -> backend
 ;; ===================
-
-(define-ipc-spec backend
-  (subscribe (room-id symbol)))
-
-(define-ipc-spec backend
-  (unsubscribe (room-id symbol)))
-
-(define-ipc-spec backend
-  (fetch-events (room-id symbol)
-                (limit integer)
-                (offset integer)))
 
 (define-ipc-spec backend
   (message:text (room-id symbol)
@@ -157,6 +149,11 @@
 
 (define-ipc-spec backend
   (mark-last-message-as-read (room-id symbol)))
+
+(define-ipc-spec backend
+  (get-messages-before (room-id symbol)
+                       (event-id symbol)
+                       (count integer)))
 
 (define-ipc-spec backend
   (login (server string) 
