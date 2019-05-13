@@ -13,8 +13,8 @@
    cjson
    vector-lib
    ioctl
-   sandbox
    srfi-18
+   srfi-69
    srfi-71
    ncurses
    miscmacros)
