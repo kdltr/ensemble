@@ -336,11 +336,7 @@
                                 (cdr events-before))
                                (else
                                  (take (cdr events-before) (- len count))))))
-    (let lp ((evts events-to-send)
-             (last-event-id (string->symbol event-id)))
-      (unless (null? evts)
-        (ipc:message-before room-id last-event-id (car evts))
-        (lp (cdr evts) (string->symbol (mref '(event_id) (car evts))))))))
+    (send-chained-messages room-id events-to-send (string->symbol event-id))))
 
 (define-ipc-implementation (login server username password)
   (delete-file* (make-pathname *profile-dir* "credentials"))

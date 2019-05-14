@@ -453,6 +453,14 @@
   (ipc-info "You have been invited to: ~a" name)
   (ipc-info "You can accept the invitation by typing `/join ~a` or reject it by typing `/leave ~a" room-id room-id))
 
+(define (send-chained-messages room-id evts last-event-id)
+  (unless (null? evts)
+    (ipc:message-before room-id last-event-id (car evts))
+    (if (hole-event? (car evts))
+        (request-hole-messages room-id (car evts) (max 10 (length evts)))
+        (send-chained-messages room-id
+                               (cdr evts)
+                               (string->symbol (mref '(event_id) (car evts)))))))
 
 ;; Holes management
 ;; ================
@@ -487,11 +495,15 @@
                     (if (pair? events)
                         (punch-hole (mref '(end) msgs) #;"FIXME state events" #())
                         values))
-           before-hole hole-state)))
+           '() hole-state)))
     ;; FIXME the state handling is wrong (have to rewind with prev_content)
-    (put! room-id 'timeline (append after-hole new-timeline))
-    )
+    (put! room-id 'timeline (append after-hole new-timeline before-hole))
+    (send-chained-messages room-id
+                           (butlast new-timeline)
+                           (string->symbol (mref '(event_id) hole-evt)))
+    (ipc:remove room-id (string->symbol (mref '(event_id) hole-evt))))
   (set! *requested-holes* (delete! hole-evt *requested-holes*)))
+
 
 (define (filter-out-known-events evts ref-evt)
   (take-while (lambda (o) (not (equal? ref-evt o))) evts))
