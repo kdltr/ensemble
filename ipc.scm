@@ -97,12 +97,6 @@
 ;; ===================
 
 (define-ipc-spec frontend
-  (bundle-start))
-
-(define-ipc-spec frontend
-  (bundle-end))
-
-(define-ipc-spec frontend
   (notifications (room-id symbol)
                  (new-hls integer)
                  (new-notifs integer)))

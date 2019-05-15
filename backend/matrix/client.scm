@@ -403,7 +403,6 @@
                     (punch-checkpoint *next-batch*)
                     values))
        '() (room-context room-id))
-      (ipc:bundle-start)
       (unless (equal? (room-display-name (room-context room-id))
                       (room-display-name new-state))
         (ipc:room-name room-id (room-display-name new-state)))
@@ -414,8 +413,7 @@
             (append timeline-additions old-timeline))
       (put! room-id 'bottom-state new-state)
       (remove-temporary-messages! room-id (vector->list events))
-      (send-timeline-events room-id timeline-additions)
-      (ipc:bundle-end))
+      (send-timeline-events room-id timeline-additions))
 
     (manage-account-data room-id account-data)
     (when highlights
@@ -482,12 +480,10 @@
            '() hole-state)))
     ;; FIXME the state handling is wrong (have to rewind with prev_content)
     (put! room-id 'timeline (timeline-append after-hole new-timeline before-hole))
-    (ipc:bundle-start)
     (send-chained-messages room-id
                            new-timeline
                            (string->symbol (mref '(event_id) hole-evt)))
-    (ipc:remove room-id (string->symbol (mref '(event_id) hole-evt)))
-    (ipc:bundle-end))
+    (ipc:remove room-id (string->symbol (mref '(event_id) hole-evt))))
   (set! *requested-holes* (delete! hole-evt *requested-holes*)))
 
 (define (request-hole-messages room-id hole-evt checkpoint-evt limit)

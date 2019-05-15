@@ -499,14 +499,17 @@
              (,*resize-channel* resize)))))
     (if fail
         (error "select failed" (list msg fail meta))
-    (case meta
-      ((worker) (handle-backend-response msg))
-      ((user) (if (eqv? msg 'resize)
-                  (set! *resize-channel* (gochan-after 25))
-                  (handle-input msg)))
-      ((resize) (resize-terminal))
-      (else (error "unknown channel sent a message" (list msg fail meta))))))
+        (handle-external-event meta msg)))
   (main-loop))
+
+(define (handle-external-event who msg)
+  (case who
+    ((worker) (handle-backend-response msg))
+    ((user) (if (eqv? msg 'resize)
+                (set! *resize-channel* (gochan-after 25))
+                (handle-input msg)))
+    ((resize) (resize-terminal))
+    (else (error "unknown channel sent a message" (list who msg)))))
 
 (define (get-input)
   (thread-wait-for-i/o! tty-fileno #:input)
@@ -535,12 +538,11 @@
       (let ((procedure (hash-table-ref/default *ipc-procedures* (car msg) #f)))
         (if procedure
             (apply procedure (cdr msg))
-            (info "unknown message from backend: ~a" msg)))))
-
-(define-ipc-implementation (bundle-start)
-  (for-each
-    handle-backend-response
-    (collect-bundle-messages)))
+            (info "unknown message from backend: ~a" msg))))
+  ;; Multiple messages in quick successions
+  (gochan-select (((worker-incomming worker) -> new-msg)
+                  (handle-backend-response new-msg))
+                 (else)))
 
 (define-ipc-implementation (notifications room-id new-hls new-notifs)
   (let* ((window (add-room-window room-id))
@@ -595,15 +597,8 @@
 (define-ipc-implementation (info message)
   (special-window-write 'backend "~a" message))
 
-
 (define (handle-backend-disconnection worker)
   (error "Backend disconnected"))
-
-(define (collect-bundle-messages)
-  (let ((msg (gochan-recv (worker-incomming worker))))
-    (if (equal? msg '(bundle-end))
-        '()
-        (cons msg (collect-bundle-messages)))))
 
 ) ;; tui module
 

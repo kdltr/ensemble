@@ -184,7 +184,6 @@
       (main-loop))
     (load-profile))
   (load-state)
-  (ipc:bundle-start)
   (for-each
     (lambda (r)
       (send-notifications r)
@@ -195,7 +194,6 @@
       (ipc:room-members r (room-member-names (room-context r)))
       (send-timeline-events r (room-timeline r)))
     (joined-rooms))
-  (ipc:bundle-end)
   (ipc-info "Synchronizing…")
   (defer 'initial-sync sync since: *next-batch*))
 
