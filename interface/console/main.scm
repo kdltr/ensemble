@@ -222,12 +222,6 @@
         (room-id (window-room id)))
     (cond (room-id
            (set! *current-window* id)
-           (let* ((tl (or (get room-id 'timeline) '()))
-                  (tl-len (length tl)))
-             (when (< tl-len rows)
-               (ipc:get-messages-before room-id
-                                        (string->symbol (alist-ref 'event_id (car tl)))
-                                        (- rows tl-len))))
            (refresh-statuswin)
            (refresh-current-window))
           (else
@@ -243,14 +237,19 @@
   (let* ((room-id (window-room id))
          (read-marker (get room-id 'read-marker))
          (tl (or (get room-id 'timeline) '()))
-         (tl-len (length tl)))
+         (tl-focused (if (room-offset room-id)
+                         (drop-right tl (room-offset room-id))
+                         tl))
+         (tl-len (length tl-focused))
+         (tl-to-display (take-right tl-focused (min tl-len rows))))
     (werase messageswin)
     (for-each
       (lambda (m)
+        (when (equal? (alist-ref 'type m)
+                      "com.upyum.ensemble.hole")
+          (ipc:fill-hole room-id (string->symbol (alist-ref 'event_id m)) rows))
         (display-message m read-marker))
-      (if (room-offset room-id)
-          (drop-right tl (room-offset room-id))
-          tl))))
+      tl-to-display)))
 
 (define (display-message message read-marker)
     (maybe-newline)

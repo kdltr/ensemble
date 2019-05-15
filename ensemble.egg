@@ -58,6 +58,7 @@
               ensemble.libs.concurrency)
             (source-dependencies
               "ipc.scm"
+              "backend/matrix/data.scm"
               "backend/matrix/low-level.scm"
               "backend/matrix/client.scm"))
    ;; Console interface

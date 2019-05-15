@@ -1,4 +1,4 @@
-chicken-install -v
+chicken-install -v -D debug
 gg -E '(TODO|FIXME|XXX)'
 
 ensemble.egg
@@ -6,6 +6,7 @@ ensemble.egg
 backend/matrix/main.scm
 backend/matrix/client.scm
 backend/matrix/low-level.scm
+backend/matrix/data.scm
 
 interface/console/main.scm
 interface/console/input.scm
@@ -13,3 +14,8 @@ interface/console/input.scm
 ipc.scm
 
 Reintroduce hole filling
+/bottom to scroll back to the end
+Remove bundle IPC
+Add state into checkpoints
+Cleanup between checkpoints
+Double-linked list for frontend history storage

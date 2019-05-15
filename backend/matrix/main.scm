@@ -55,6 +55,7 @@
 
 (define +ensemble-version+ "dev")
 
+(include-relative "data.scm")
 (include-relative "low-level.scm")
 (include-relative "client.scm")
 
@@ -192,7 +193,7 @@
       (ipc:room-name r (or (room-display-name (room-context r))
                            (symbol->string r)))
       (ipc:room-members r (room-member-names (room-context r)))
-      (send-timeline-events r (room-timeline r limit: 10)))
+      (send-timeline-events r (room-timeline r)))
     (joined-rooms))
   (ipc:bundle-end)
   (ipc-info "Synchronizing…")
@@ -260,9 +261,8 @@
       (handle-exceptions exn
         (begin
           (cond-expand
-            (debug (info "Exception caugth: ~a~%~a" exn
-                         (exception->string exn))
-                   (print-call-chain (info-port)))
+            (debug (info "Exception caugth: ~a~%" exn
+                         (exception->string exn)))
             (else (void)))
           (ipc-info "Error in backend: ~a" (exception->string exn)))
         (let ((procedure (hash-table-ref/default *ipc-procedures* (car exp) #f)))
@@ -271,8 +271,10 @@
               (ipc-info "Error in backend: unknown IPC message received: ~a" exp))))))
 
 (define (exception->string exn)
-  (get-condition-property exn 'exn 'message ""))
-
+  (with-output-to-string
+    (lambda ()
+      (print-error-message exn)
+      (print-call-chain))))
 
 ;; IPC definitions
 ;; ===============
@@ -324,19 +326,20 @@
     (ipc:read-marker room-id (string->symbol evt-id))
     (ipc:notifications room-id 0 0)))
 
-(define-ipc-implementation (get-messages-before room-id event-id count)
-  (let* ((tl (room-timeline room-id))
-         (event-id (symbol->string event-id))
-         (events-before (drop-while (lambda (evt)
-                                      (not (equal? event-id (mref '(event_id) evt))))
-                                    tl))
-         (len (length events-before))
-         (events-to-send (cond ((zero? len) '())
-                               ((<= len count)
-                                (cdr events-before))
-                               (else
-                                 (take (cdr events-before) (- len count))))))
-    (send-chained-messages room-id events-to-send (string->symbol event-id))))
+(define-ipc-implementation (fill-hole room-id event-id count)
+  (let* ((maybe-timeline-from-hole (find-tail (lambda (e) (equal? (alist-ref 'event_id e)
+                                                                  (symbol->string event-id)))
+                                              (room-timeline room-id))))
+    (cond ((not maybe-timeline-from-hole)
+           (void))
+          ((null? (cdr maybe-timeline-from-hole))
+           ;; Hole at the end of the timeline
+           (request-hole-messages room-id (car maybe-timeline-from-hole) #f count))
+          ;; Hole somewhere in the timeline
+          (else
+            (let ((hole-event (car maybe-timeline-from-hole))
+                  (checkpoint-event (cadr maybe-timeline-from-hole)))
+              (request-hole-messages room-id hole-event checkpoint-event count))))))
 
 (define-ipc-implementation (login server username password)
   (delete-file* (make-pathname *profile-dir* "credentials"))
@@ -353,6 +356,9 @@
 
 (define-ipc-implementation (leave-room room-id)
   (defer 'leave-room room-leave room-id '()))
+
+(define-ipc-implementation (stop)
+  (exit))
 
 
 ;; Temporary messages

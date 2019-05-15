@@ -29,13 +29,6 @@
            (or (member-displayname (caaar others) ctx)
                (caaar others)))))
 
-(define (split-timeline tl evt)
-  (let loop ((before tl)
-             (after '()))
-    (if (equal? evt (car before))
-        (values (cdr before) (reverse after))
-        (loop (cdr before) (cons (car before) after)))))
-
 (define new-transaction-id
   (let ((cnt 0))
     (lambda ()
@@ -346,17 +339,23 @@
                           (formated . ,formated)
                           ,@(if highlight? '((highlight . #t)) '()))))
           (loop (add1 i)
-                (cons fmt-evt timeline)
+                (timeline-cons fmt-evt timeline)
                 new-state)))))
 
 (define ((punch-hole prev-batch state-events) timeline state)
-  (info "Punching hole: ~s" prev-batch)
-  (values (cons (make-hole-event prev-batch state)
-                timeline)
-          (vector-fold (lambda (i ctx evt)
-                         (update-context ctx evt))
-                       state
-                       state-events)))
+  (let ((new-state (vector-fold (lambda (i ctx evt)
+                                  (update-context ctx evt))
+                                state
+                                state-events)))
+    (info "Punching hole: ~s" prev-batch)
+    (values (timeline-cons (make-hole-event prev-batch new-state)
+                           timeline)
+            new-state)))
+
+(define ((punch-checkpoint next-batch) timeline state)
+  (values (timeline-cons (make-checkpoint-event next-batch)
+                         timeline)
+          state))
 
 (define (manage-account-data room-id events)
   (vector-for-each (lambda (i evt)
@@ -399,6 +398,9 @@
                 ;; Timeline Hole
                 (if limited
                     (punch-hole prev-batch state)
+                    values)
+                (if limited
+                    (punch-checkpoint *next-batch*)
                     values))
        '() (room-context room-id))
       (ipc:bundle-start)
@@ -430,9 +432,6 @@
 (define (send-timeline-events room-id tl)
   (for-each
     (lambda (m)
-      ;; TODO reintroduce
-      #;(when (hole-event? m)
-        (request-hole-messages room-id m *last-known-limit*))
       (ipc:message room-id (cleanup-event m)))
     (reverse tl)))
 
@@ -456,62 +455,49 @@
 (define (send-chained-messages room-id evts last-event-id)
   (unless (null? evts)
     (ipc:message-before room-id last-event-id (car evts))
-    (if (hole-event? (car evts))
-        (request-hole-messages room-id (car evts) (max 10 (length evts)))
-        (send-chained-messages room-id
-                               (cdr evts)
-                               (string->symbol (mref '(event_id) (car evts)))))))
+    (send-chained-messages room-id
+                           (cdr evts)
+                           (string->symbol (mref '(event_id) (car evts))))))
 
 ;; Holes management
 ;; ================
 
 (define *requested-holes* '())
 
-(define (make-hole-event from state)
-  (let ((evt-id (sprintf "hole-~A" from)))
-    `((event_id . ,evt-id)
-      (type . "com.upyum.ensemble.hole")
-      (content (from . ,from)
-               (state . ,state))
-      (formated . "… some history missing …"))))
-
-(define (hole-event? evt)
-  (equal? (mref '(type) evt)
-            "com.upyum.ensemble.hole"))
-
 (define (fill-hole room-id hole-evt msgs)
-  (info "[fill-hole] ~a ~a~%" room-id hole-evt)
+  (info "[fill-hole] ~a ~s~%" room-id hole-evt)
   (let* ((timeline (room-timeline room-id))
-         (before-hole after-hole (split-timeline timeline hole-evt))
+         (before-hole after-hole (timeline-split timeline hole-evt))
          (hole-state (mref '(content state) hole-evt))
-         (events (filter-out-known-events
-                  (reverse (vector->list (mref '(chunk) msgs)))
-                  (if (pair? before-hole) (car before-hole) '())))
+         (events (vector-reverse-copy (mref '(chunk) msgs)))
          (new-timeline new-state
-          ((compose ;; Timeline events
-                    (advance-timeline (list->vector events))
+          ((compose ;; New checkpoint
+                    (punch-checkpoint (mref '(content from) hole-evt))
+                    ;; Timeline events
+                    (advance-timeline events)
                     ;; Timeline Hole
-                    values
-                    (if (pair? events)
+                    (if (> (vector-length events) 0)
                         (punch-hole (mref '(end) msgs) #;"FIXME state events" #())
                         values))
            '() hole-state)))
     ;; FIXME the state handling is wrong (have to rewind with prev_content)
-    (put! room-id 'timeline (append after-hole new-timeline before-hole))
+    (put! room-id 'timeline (timeline-append after-hole new-timeline before-hole))
+    (ipc:bundle-start)
     (send-chained-messages room-id
-                           (butlast new-timeline)
+                           new-timeline
                            (string->symbol (mref '(event_id) hole-evt)))
-    (ipc:remove room-id (string->symbol (mref '(event_id) hole-evt))))
+    (ipc:remove room-id (string->symbol (mref '(event_id) hole-evt)))
+    (ipc:bundle-end))
   (set! *requested-holes* (delete! hole-evt *requested-holes*)))
 
-
-(define (filter-out-known-events evts ref-evt)
-  (take-while (lambda (o) (not (equal? ref-evt o))) evts))
-
-(define (request-hole-messages room-id hole-evt limit)
+(define (request-hole-messages room-id hole-evt checkpoint-evt limit)
+  (assert (hole-event? hole-evt))
+  (assert (if checkpoint-evt (checkpoint-event? checkpoint-evt) #t))
   (define (defered)
     (let* ((msgs (room-messages room-id
                                 from: (mref '(content from) hole-evt)
+                                to: (and checkpoint-evt
+                                         (mref '(content to) checkpoint-evt))
                                 limit: limit
                                 dir: 'b)))
       (list room-id hole-evt msgs)))

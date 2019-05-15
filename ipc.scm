@@ -48,9 +48,9 @@
 (define-syntax define-ipc-implementation
   (ir-macro-transformer
     (lambda (exp inject compare)
-      (let* ((spec (cadr exp))
-             (name (strip-syntax (car spec)))
-             (args (cdr spec))
+      (let* ((signature (cadr exp))
+             (name (strip-syntax (car signature)))
+             (args (cdr signature))
              (body (cddr exp))
              (proc-name (inject (symbol-append '|ipc-impl:| name)))
              (spec (hash-table-ref *ipc-specs* name))
@@ -151,9 +151,9 @@
   (mark-last-message-as-read (room-id symbol)))
 
 (define-ipc-spec backend
-  (get-messages-before (room-id symbol)
-                       (event-id symbol)
-                       (count integer)))
+  (fill-hole (room-id symbol)
+             (event-id symbol)
+             (count integer)))
 
 (define-ipc-spec backend
   (login (server string) 
@@ -165,3 +165,6 @@
 
 (define-ipc-spec backend
   (leave-room (room-id string)))
+
+(define-ipc-spec backend
+  (stop))
