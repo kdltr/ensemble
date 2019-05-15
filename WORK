@@ -13,8 +13,6 @@ interface/console/input.scm
 
 ipc.scm
 
-Reintroduce hole filling
-/bottom to scroll back to the end
 Remove bundle IPC
 Add state into checkpoints
 Cleanup between checkpoints

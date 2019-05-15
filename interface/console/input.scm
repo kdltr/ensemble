@@ -362,3 +362,7 @@
 
 (define-command (exit quit) joined args
   (exit))
+
+(define-command (bottom) joined args
+  (room-offset-delete! (current-room))
+  (refresh-current-window))
