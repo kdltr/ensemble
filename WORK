@@ -1,6 +1,6 @@
 chicken-install
 -v -D debug
--D release
+-n -D release
 gg -E '(TODO|FIXME|XXX)'
 
 ensemble.egg
@@ -17,4 +17,3 @@ ipc.scm
 
 Cleanup between checkpoints
 Double-linked list for frontend history storage
-Correct context handling for holes

@@ -52,7 +52,7 @@
   (make-event (sprintf "$hole-~A" from)
               "com.upyum.ensemble.hole"
               `((from . ,from)
-                (state . ,context))
+                (context . ,context))
               '()))
 
 (: make-checkpoint-event (string list -> event))
@@ -60,7 +60,7 @@
   (make-event (sprintf "$checkpoint-~A" next-batch)
               "com.upyum.ensemble.checkpoint"
               `((to . ,next-batch)
-                (state . ,context))
+                (context . ,context))
               '()))
 
 ;; Timeline management

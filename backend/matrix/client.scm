@@ -468,25 +468,28 @@
 
 (define *requested-holes* '())
 
-;; FIXME Compute states correctly!
 (define (fill-hole room-id hole-evt msgs)
   (info "[fill-hole] ~a ~s~%" room-id hole-evt)
   (let* ((timeline (room-timeline room-id))
          (before-hole after-hole (timeline-split timeline hole-evt))
-         (hole-state (mref '(content state) hole-evt))
-         (events (vector-reverse-copy (mref '(chunk) msgs)))
-         (new-timeline new-state
+         (context-at-hole (mref '(content context) hole-evt))
+         (events-reversed (mref '(chunk) msgs))
+         (context-before-hole (vector-fold (lambda (i ctx evt)
+                                             (update-context ctx evt #t))
+                                           context-at-hole
+                                           events-reversed))
+         (events (vector-reverse-copy events-reversed))
+         (new-timeline new-context
           ((compose ;; New checkpoint that replaces the previous hole
                     (punch-checkpoint (mref '(content from) hole-evt)
-                                      hole-state)
+                                      context-at-hole)
                     ;; Timeline events
                     (advance-timeline events)
                     ;; Timeline Hole
                     (if (> (vector-length events) 0)
-                        (punch-hole (mref '(end) msgs) '())
+                        (punch-hole (mref '(end) msgs) context-before-hole)
                         values))
-           '() hole-state)))
-    ;; FIXME the state handling is wrong (have to rewind with prev_content)
+           '() context-before-hole)))
     (put! room-id 'timeline (timeline-append after-hole new-timeline before-hole))
     (send-chained-messages room-id
                            new-timeline
