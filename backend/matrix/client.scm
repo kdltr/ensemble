@@ -341,6 +341,7 @@
                                 (irregex-search (list 'w/nocase my-name)
                                                 formated)))
                (fmt-evt `((event_id . ,evt-id)
+                          (type . ,(alist-ref 'type evt))
                           (formated . ,formated)
                           ,@(if highlight? '((highlight . #t)) '()))))
           (loop (add1 i)

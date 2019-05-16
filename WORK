@@ -1,4 +1,6 @@
-chicken-install -v -D debug
+chicken-install
+-v -D debug
+-D release
 gg -E '(TODO|FIXME|XXX)'
 
 ensemble.egg

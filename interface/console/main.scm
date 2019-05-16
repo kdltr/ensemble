@@ -248,7 +248,9 @@
         (when (equal? (alist-ref 'type m)
                       "com.upyum.ensemble.hole")
           (ipc:fill-hole room-id (string->symbol (alist-ref 'event_id m)) rows))
-        (display-message m read-marker))
+        (unless (equal? (alist-ref 'type m)
+                        "com.upyum.ensemble.checkpoint")
+          (display-message m read-marker)))
       tl-to-display)))
 
 (define (display-message message read-marker)
