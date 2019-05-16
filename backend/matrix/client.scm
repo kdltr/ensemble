@@ -360,8 +360,8 @@
                            timeline)
             new-state)))
 
-(define ((punch-checkpoint next-batch) timeline state)
-  (values (timeline-cons (make-checkpoint-event next-batch)
+(define ((punch-checkpoint next-batch context) timeline state)
+  (values (timeline-cons (make-checkpoint-event next-batch context)
                          timeline)
           state))
 
@@ -408,7 +408,7 @@
                     (punch-hole prev-batch state)
                     values)
                 (if limited
-                    (punch-checkpoint *next-batch*)
+                    (punch-checkpoint *next-batch* (room-context room-id))
                     values))
        '() (room-context room-id))
       (unless (equal? (room-display-name (room-context room-id))
@@ -470,6 +470,7 @@
 
 (define *requested-holes* '())
 
+;; FIXME Compute states correctly!
 (define (fill-hole room-id hole-evt msgs)
   (info "[fill-hole] ~a ~s~%" room-id hole-evt)
   (let* ((timeline (room-timeline room-id))
@@ -477,13 +478,14 @@
          (hole-state (mref '(content state) hole-evt))
          (events (vector-reverse-copy (mref '(chunk) msgs)))
          (new-timeline new-state
-          ((compose ;; New checkpoint
-                    (punch-checkpoint (mref '(content from) hole-evt))
+          ((compose ;; New checkpoint that replaces the previous hole
+                    (punch-checkpoint (mref '(content from) hole-evt)
+                                      hole-state)
                     ;; Timeline events
                     (advance-timeline events)
                     ;; Timeline Hole
                     (if (> (vector-length events) 0)
-                        (punch-hole (mref '(end) msgs) #;"FIXME state events" #())
+                        (punch-hole (mref '(end) msgs) #())
                         values))
            '() hole-state)))
     ;; FIXME the state handling is wrong (have to rewind with prev_content)

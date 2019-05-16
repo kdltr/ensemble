@@ -48,18 +48,19 @@
     evt))
 
 (: make-hole-event (string list -> event))
-(define (make-hole-event from state)
+(define (make-hole-event from context)
   (make-event (sprintf "$hole-~A" from)
               "com.upyum.ensemble.hole"
               `((from . ,from)
-                (state . ,state))
+                (state . ,context))
               '()))
 
-(: make-checkpoint-event (string -> event))
-(define (make-checkpoint-event next-batch)
+(: make-checkpoint-event (string list -> event))
+(define (make-checkpoint-event next-batch context)
   (make-event (sprintf "$checkpoint-~A" next-batch)
               "com.upyum.ensemble.checkpoint"
-              `((to . ,next-batch))
+              `((to . ,next-batch)
+                (state . ,context))
               '()))
 
 ;; Timeline management

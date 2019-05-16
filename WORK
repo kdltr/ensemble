@@ -14,6 +14,5 @@ interface/console/input.scm
 ipc.scm
 
 Fix state sending after first initial-sync (room name, members…)
-Add state into checkpoints
 Cleanup between checkpoints
 Double-linked list for frontend history storage
