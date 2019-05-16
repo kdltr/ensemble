@@ -90,7 +90,8 @@
           (write `(invitation ,(car inv) ,(cdr inv)))
           (newline))
         *rooms-invited*)
-      (write `(next-batch ,*next-batch*))))
+      (write `(next-batch ,*next-batch*))
+      (write `(state-version ,+state-cache-version+))))
   (info "Done saving state"))
 
 (define +properties-saved+
@@ -111,8 +112,13 @@
 
 (define (load-state)
   (ipc-info "Loading profile cache")
+  (define found-state-version #f)
   (define (load exp)
     (case (car exp)
+      ((state-version)
+       (set! found-state-version #t)
+       (unless (equal? (cadr exp) +state-cache-version+)
+         (error "state cache is out of date")))
       ((room)
        (set! (symbol-plist (cadr exp))
          (caddr exp))
@@ -129,7 +135,9 @@
     (when (file-exists? *state-file*)
       (with-input-from-file *state-file*
         (lambda ()
-          (port-for-each load read))))))
+          (port-for-each load read)))
+      (unless found-state-version
+        (error "state cache is out of date")))))
 
 
 

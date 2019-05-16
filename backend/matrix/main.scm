@@ -54,6 +54,7 @@
 (define *last-known-limit* 10)
 
 (define +ensemble-version+ "dev")
+(define +state-cache-version+ 1)
 
 (include-relative "data.scm")
 (include-relative "low-level.scm")
