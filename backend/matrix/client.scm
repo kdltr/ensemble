@@ -363,8 +363,7 @@
                      (when (equal? (mref '(type) evt) "m.fully_read")
                        (let ((id (string->symbol (mref '(content event_id) evt))))
                          (read-marker-set! room-id id)
-                         (when (get room-id 'frontend-subscribed)
-                           (ipc:read-marker room-id id)))))
+                         (ipc:read-marker room-id id))))
                    events))
 
 (define (handle-sync batch)
