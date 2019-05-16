@@ -50,7 +50,7 @@
   (pair? (symbol-plist id)))
 
 (define (room-context id)
-  (get id 'bottom-state))
+  (or (get id 'bottom-state) '()))
 
 (define (last-state-set! room-id ctx)
   (put! room-id 'bottom-state ctx))
@@ -319,13 +319,10 @@
 ;; Room management
 ;; ===============
 
-(define (initialize-room! room-id state-events)
-  (let* ((state (initial-context state-events)))
-    (put! room-id 'top-state state)
-    (put! room-id 'bottom-state state)
-    (put! room-id 'timeline '())
-    (push! room-id *rooms*)
-    state))
+(define (initialize-room! room-id context)
+  (put! room-id 'bottom-state context)
+  (put! room-id 'timeline '())
+  (push! room-id *rooms*))
 
 (define ((advance-timeline events) timeline state)
   (let loop ((i 0)
@@ -350,20 +347,16 @@
                 (timeline-cons fmt-evt timeline)
                 new-state)))))
 
-(define ((punch-hole prev-batch state-events) timeline state)
-  (let ((new-state (vector-fold (lambda (i ctx evt)
-                                  (update-context ctx evt))
-                                state
-                                state-events)))
-    (info "Punching hole: ~s" prev-batch)
-    (values (timeline-cons (make-hole-event prev-batch new-state)
-                           timeline)
-            new-state)))
-
-(define ((punch-checkpoint next-batch context) timeline state)
-  (values (timeline-cons (make-checkpoint-event next-batch context)
+(define ((punch-hole prev-batch hole-context) timeline context-now)
+  (info "Punching hole: ~s" prev-batch)
+  (values (timeline-cons (make-hole-event prev-batch hole-context)
                          timeline)
-          state))
+          context-now))
+
+(define ((punch-checkpoint next-batch checkpoint-context) timeline context-now)
+  (values (timeline-cons (make-checkpoint-event next-batch checkpoint-context)
+                         timeline)
+          context-now))
 
 (define (manage-account-data room-id events)
   (vector-for-each (lambda (i evt)
@@ -389,37 +382,42 @@
          (events (mref '(timeline events) room-data))
          (account-data (mref '(account_data events) room-data))
          (prev-batch (mref '(timeline prev_batch) room-data))
-         (state* (mref '(state events) room-data))
-         (state (if (vector? state*) state* #()))
+         (state-events (mref '(state events) room-data))
+         (state-events (if (vector? state-events) state-events #()))
+         (context-before (room-context room-id))
+         (context-now (vector-fold (lambda (i ctx evt)
+                                     (update-context ctx evt))
+                                   context-before
+                                   state-events))
          (notifs (json-true? (mref '(unread_notifications notification_count)
                                    room-data)))
          (highlights (json-true? (mref '(unread_notifications highlight_count)
                                        room-data)))
          (old-timeline (room-timeline room-id)))
     (unless (room-exists? room-id)
-      (initialize-room! room-id state))
+      (initialize-room! room-id context-now))
     (set! *rooms-invited*
       (alist-delete! room-id *rooms-invited*))
-    (receive (timeline-additions new-state)
+    (receive (timeline-additions context-after)
       ((compose ;; Timeline events
                 (advance-timeline events)
                 ;; Timeline Hole
                 (if limited
-                    (punch-hole prev-batch state)
+                    (punch-hole prev-batch context-now)
                     values)
                 (if limited
-                    (punch-checkpoint *next-batch* (room-context room-id))
+                    (punch-checkpoint *next-batch* context-before)
                     values))
-       '() (room-context room-id))
-      (unless (equal? (room-display-name (room-context room-id))
-                      (room-display-name new-state))
-        (ipc:room-name room-id (room-display-name new-state)))
-      (unless (equal? (room-member-names (room-context room-id))
-                      (room-member-names new-state))
-        (ipc:room-members room-id (room-member-names new-state)))
+       '() context-now)
+      (unless (equal? (room-display-name context-before)
+                      (room-display-name context-after))
+        (ipc:room-name room-id (room-display-name context-after)))
+      (unless (equal? (room-member-names context-before)
+                      (room-member-names context-after))
+        (ipc:room-members room-id (room-member-names context-after)))
       (put! room-id 'timeline
-            (append timeline-additions old-timeline))
-      (put! room-id 'bottom-state new-state)
+            (timeline-append timeline-additions old-timeline))
+      (put! room-id 'bottom-state context-after)
       (remove-temporary-messages! room-id (vector->list events))
       (send-timeline-events room-id timeline-additions))
 
@@ -485,7 +483,7 @@
                     (advance-timeline events)
                     ;; Timeline Hole
                     (if (> (vector-length events) 0)
-                        (punch-hole (mref '(end) msgs) #())
+                        (punch-hole (mref '(end) msgs) '())
                         values))
            '() hole-state)))
     ;; FIXME the state handling is wrong (have to rewind with prev_content)
