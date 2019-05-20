@@ -220,9 +220,10 @@
         (case (string->symbol type)
           ((m.emote) (sprintf "* ~a ~a" name body))
           ((m.image m.file m.video m.audio)
-           (sprintf "*** ~a uploaded ~a: ~a" name body
-                    (or (mxc->url (mref '(content url) evt))
-                        "[invalid uri]")))
+           (let ((url (mref '(content url) evt)))
+             (sprintf "*** ~a uploaded ~a: ~a" name body
+                      (or (and url (string? url) (mxc->url url))
+                          "[invalid uri]"))))
           (else (sprintf "<~a> ~a" name body)))
         (sprintf "<~a> [redacted]" name))
         ))
