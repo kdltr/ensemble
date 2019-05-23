@@ -13,7 +13,31 @@ backend/matrix/data.scm
 interface/console/main.scm
 interface/console/input.scm
 
+interface/new-console/main.scm
+
+libs/history.scm
+libs/bindings.scm
+
 ipc.scm
 
+Backend:
 Cleanup between checkpoints
-Double-linked list for frontend history storage
+
+Frontend:
+Double-linked list for history storage
+Multiline messages
+8bit mode (CSI is U+009B, not "ESC+[")
+Extended input scheme http://www.leonerd.org.uk/hacks/fixterms/
+
+csi
+,l
+interface/new-console/main.scm
+(read-char *terminal-input-port*)
+(output-to-terminal (erase-in-display entirety) (cursor-visibility #t))
+(output-to-terminal # (test-render))
+
+(focus-up)
+
+(node-n-lines-above (- *terminal-height* *interface-height*) (focus-node *focus*) (focus-line *focus*))
+(message-text (history-data #))
+(output-to-terminal (scroll-down 1) (cursor-position 1 2) (erase-in-line entirety) # (test-render))

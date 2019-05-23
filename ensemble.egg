@@ -46,6 +46,9 @@
               (component-dependencies
                 ensemble.libs.debug
                 ensemble.libs.nonblocking-ports))
+   (extension ensemble.libs.history
+              (source "libs/history.scm")
+              #;(csc-options "-d0"))
    ;; Matrix backend
    (program ensemble.backend.matrix
             (source "backend/matrix/main.scm")
