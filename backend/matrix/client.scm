@@ -201,14 +201,15 @@
 ;; ===============
 
 (define (mxc->url mxc)
-  (let ((mxc-uri (uri-reference mxc)))
-    (if (eq? (uri-scheme mxc-uri) 'mxc)
+  (or
+      (and-let* ((_ (string? mxc))
+                 (mxc-uri (uri-reference mxc))
+                 (_ (eq? (uri-scheme mxc-uri) 'mxc)))
         (uri->string
           (update-uri (server-uri)
-                      path: `(/ "_matrix" "media" "r0" "download" 
-                                ,(uri-host mxc-uri) ,(cadr (uri-path mxc-uri)))))
-        #f)))
-
+                      path: `(/ "_matrix" "media" "r0" "download"
+                                ,(uri-host mxc-uri) ,(cadr (uri-path mxc-uri))))))
+      "[invalid uri]"))
 
 (define (m.room.message-printer evt ctx)
   (let* ((sender (mref '(sender) evt))
@@ -221,9 +222,7 @@
           ((m.emote) (sprintf "* ~a ~a" name body))
           ((m.image m.file m.video m.audio)
            (let ((url (mref '(content url) evt)))
-             (sprintf "*** ~a uploaded ~a: ~a" name body
-                      (or (and url (string? url) (mxc->url url))
-                          "[invalid uri]"))))
+             (sprintf "*** ~a uploaded ~a: ~a" name body (mxc->url url))))
           (else (sprintf "<~a> ~a" name body)))
         (sprintf "<~a> [redacted]" name))
         ))
