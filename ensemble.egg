@@ -19,10 +19,9 @@
    ncurses
    miscmacros)
  (platform (not windows))
- ;; TODO make dynamic-only the default with CHICKEN 5.1 and add a feature for static build
- #;(cond-expand
-       (dynamic-only (component-options (linkage dynamic)))
-       (else))
+ (cond-expand
+       (release (component-options (linkage static)))
+       (else (component-options (linkage dynamic))))
  (components
    ;; Helper libraries
    (extension ensemble.libs.debug
@@ -46,9 +45,6 @@
               (component-dependencies
                 ensemble.libs.debug
                 ensemble.libs.nonblocking-ports))
-   (extension ensemble.libs.history
-              (source "libs/history.scm")
-              #;(csc-options "-d0"))
    ;; Matrix backend
    (program ensemble.backend.matrix
             (source "backend/matrix/main.scm")
@@ -63,7 +59,10 @@
               "ipc.scm"
               "backend/matrix/data.scm"
               "backend/matrix/low-level.scm"
-              "backend/matrix/client.scm"))
+              "backend/matrix/client.scm")
+            (cond-expand
+              (release (link-options "-L" "-lssl -lcrypto"))
+              (else)))
    ;; Console interface
    (extension ensemble.interface.console
               (source "interface/console/main.scm")
@@ -78,5 +77,8 @@
             (csc-options "-d0")
             (component-dependencies
               ensemble.libs.bindings
-              ensemble.interface.console))
+              ensemble.interface.console)
+            (cond-expand
+              (release (link-options "-L" "-lncursesw"))
+              (else)))
    ))
