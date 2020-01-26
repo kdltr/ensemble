@@ -17,7 +17,7 @@
       (room-mark-read room-id evt-id)
       evt-id)))
 
-(define (room-display-name ctx)
+(define (room-display-name room-id ctx)
   (or (and (not ctx) "")
       (room-name ctx)
       (json-true? (mref '(("" . m.room.canonical_alias) alias) ctx))
@@ -27,7 +27,8 @@
                  (check (= (length members) 2))
                  (others (remove (lambda (p) (equal? (caar p) (string-downcase (mxid)))) members)))
            (or (member-displayname (caaar others) ctx)
-               (caaar others)))))
+               (caaar others)))
+      (symbol->string room-id)))
 
 (define new-transaction-id
   (let ((cnt 0))
@@ -412,9 +413,9 @@
                     (punch-checkpoint *next-batch* context-before)
                     values))
        '() context-now)
-      (unless (equal? (room-display-name context-before)
-                      (room-display-name context-after))
-        (ipc:room-name room-id (room-display-name context-after)))
+      (unless (equal? (room-display-name room-id context-before)
+                      (room-display-name room-id context-after))
+        (ipc:room-name room-id (room-display-name room-id context-after)))
       (unless (equal? (room-member-names context-before)
                       (room-member-names context-after))
         (ipc:room-members room-id (room-member-names context-after)))
@@ -450,8 +451,7 @@
          (state-events (or (mref '(invite_state events) (cdr id+invited-room))
                            '()))
          (state (initial-context state-events))
-         (name (or (room-display-name state)
-                   (symbol->string room-id))))
+         (name (room-display-name room-id state)))
     (send-invitation-notice room-id name)))
 
 (define (send-invitation-notice room-id name)
