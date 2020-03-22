@@ -209,6 +209,8 @@
       ((sync) (defer 'sync sync timeout: 30000 since: (handle-sync datum)))
       ((rpc) (handle-rpc datum) (defer 'rpc read))
       ((hole-messages) (apply fill-hole datum))
+      ((message) (set! *queue-waiting* #f)
+                 (send-queued-message))
       (else  (info "Unknown defered procedure: ~a ~s~%" who datum))
       ))
   (main-loop))
@@ -239,6 +241,9 @@
             (ipc-info "Client error (in ~a): ~a"
                       (defered-id-name exn)
                       (exception->string exn))
+            ;; FIXME this isn’t right to retry client error
+            ;; but rate-limiting is a client error… (error code 429)
+            (do-retry exn)
             (values 'no-one #f))
           (exn (exn http premature-disconnection)
             (ipc-info "Premature disconnection (in ~a): ~a"
@@ -297,6 +302,20 @@
                                    "%d/%m %H:%M")
                      msg rest)))
 
+(define *message-queue* '())
+(define *queue-waiting* #f)
+
+(define (queue-message msg)
+  (push! msg *message-queue*)
+  (send-queued-message))
+
+(define (send-queued-message)
+  (unless (or *queue-waiting*
+              (null? *message-queue*))
+    (apply defer 'message room-send (last *message-queue*))
+    (set! *queue-waiting* #t)
+    (set! *message-queue* (butlast *message-queue*))))
+
 (define-ipc-implementation (message:text room-id str)
   (let ((transaction-id (new-transaction-id))
         (event-contents `((msgtype . "m.text")
@@ -304,9 +323,8 @@
     (add-temporary-message! room-id
                             transaction-id
                             event-contents)
-    (defer 'message room-send
-           room-id 'm.room.message
-           transaction-id event-contents)))
+    (queue-message (list room-id 'm.room.message
+                         transaction-id event-contents))))
 
 (define-ipc-implementation (message:emote room-id str)
   (let ((transaction-id (new-transaction-id))
@@ -315,9 +333,8 @@
     (add-temporary-message! room-id
                             transaction-id
                             event-contents)
-    (defer 'message room-send
-           room-id 'm.room.message
-           transaction-id event-contents)))
+    (queue-message (list room-id 'm.room.message
+                         transaction-id event-contents))))
 
 (define-ipc-implementation (mark-last-message-as-read room-id)
   (let ((evt-id (mark-last-message-as-read room-id)))
