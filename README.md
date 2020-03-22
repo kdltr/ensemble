@@ -17,16 +17,11 @@ If you want to support this project, consider donating [on liberapay](https://li
 How to use it
 -------------
 
-Run `migrate.sh` to convert the pre 0.5 database to a profile for the new version.
+If you grabbed the source, build with: `make`.
+You will need CHICKEN 5.2.0 or higher, the ncursesw and openssl packages
+with their development files, as well as pkg-config.
 
-If you grabbed the source from git, build with:
-`make`
-
-Run with:
-`./run.sh`
-
-
-If you didn’t use Ensemble before 0.5, you can use the /login command.
+If you haven’t used Ensemble before, you can use the /login command.
 Just type `/login` on the backend window and follow the steps.
 
 You can quit by typing `/exit` or `/quit` at the input prompt.

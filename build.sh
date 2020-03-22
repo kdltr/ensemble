@@ -3,7 +3,7 @@
 set -e
 
 extract_dependencies() {
-    csi -e "(for-each print (alist-ref 'dependencies (with-input-from-file \"ensemble.egg\" read)))" | grep -Ev '(ncurses|bind|utf8)'
+    csi -e "(for-each print (alist-ref 'dependencies (with-input-from-file \"ensemble.egg\" read)))" | grep -Ev '(ncurses|bind)'
 }
 
 build_normal_deps() {
@@ -16,34 +16,20 @@ build_custom_dep() {
     chicken-install
 }
 
-build_sudo_deps() {
-    echo "WARNING"
-    echo 'It seems you don’t have write access to the default CHICKEN prefix'
-    echo 'Some dependencies need that, installing them with `sudo`.'
-    echo 'If you don’t have `sudo` on your platform, you can chose which tool to use by setting the SUDO environment variable'
-    chicken-install -s bind
-    chicken-install -s utf8
-}
-
 cd "`dirname $0`"
 
-# Little hack for extensions that install stuff outside of the repository
-if test -w "`chicken-install -repository`"; then
-    chicken-install bind utf8
-else
-    build_sudo_deps
-fi
+CHICKEN_REPOSITORY_PATH="`pwd`:`pwd`/repo:`csi -R chicken.platform -p '(car (repository-path))'`"
+export CHICKEN_REPOSITORY_PATH
 
-. ./vars.sh
+export CHICKEN_INSTALL_REPOSITORY=`pwd`/repo
+mkdir -p $CHICKEN_INSTALL_REPOSITORY
 
 test -d .git && git submodule update --init
 
-( build_custom_dep chicken-ncurses )
-
+( build_custom_dep bind-egg chicken-ncurses )
 build_normal_deps
 
 # Build Ensemble itself (without installing)
-chicken-install -n
+chicken-install -n -D release
 
 echo "Ensemble has been built, yay! \o/"
-echo 'Run it with `./run.sh`'
