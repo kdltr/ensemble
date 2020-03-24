@@ -43,6 +43,7 @@
 
 (include-relative "input.scm")
 
+(define +ensemble-version+ (include ".version"))
 (define +backend-executable+ "ensemble.backend.matrix")
 
 (define tty-fileno 0)
@@ -339,7 +340,7 @@
   (keypad inputwin #t)
   (set! statuswin (newwin 1 cols (- rows 2) 0))
   (wbkgdset statuswin A_REVERSE)
-  (special-window-write 'ensemble "Loading…"))
+  (special-window-write 'ensemble (conc "Welcome to Ensemble " +ensemble-version+)))
 
 ;; FIXME less hacky solution
 (define (run-login-prompt)

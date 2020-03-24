@@ -53,7 +53,7 @@
 (define *state-file*)
 (define *last-known-limit* 10)
 
-(define +ensemble-version+ "dev")
+(define +ensemble-version+ (include ".version"))
 (define +state-cache-version+ 1)
 
 (include-relative "data.scm")
