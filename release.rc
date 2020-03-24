@@ -1,0 +1,30 @@
+#!/usr/bin/env rc
+
+flag e +
+flag x +
+
+srcdir = ``($nl){pwd}
+version = ``($nl){git describe --tags}
+dstdir = 'ensemble-'^$version
+
+git clone . $dstdir
+
+cd $dstdir
+
+echo '"'^$version^'"' >.version
+
+# clone submodules (ncurses)
+git submodule update --init
+rm -rf .git
+
+# retreive bind and remove the program component
+chicken-install -purge
+bind_location = ``($nl){chicken-install -r bind |[2] grep -o '/.*'}
+cp -r $bind_location ./bind-egg
+cd bind-egg
+csi -R srfi-1 -P '(let* ((orig (read)) (components (alist-ref ''components orig)) (host (alist-ref ''host components))) (alist-update ''components (alist-update ''host (alist-delete ''program host) components) orig))' <bind.egg >bind.egg.new
+mv bind.egg.new bind.egg
+
+# make the final source archive
+cd $srcdir
+tar zcf $dstdir^'.tar.gz' $dstdir
