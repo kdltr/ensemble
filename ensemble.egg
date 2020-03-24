@@ -61,7 +61,7 @@
               "backend/matrix/low-level.scm"
               "backend/matrix/client.scm")
             (cond-expand
-              (release (link-options "-L" "-lssl -lcrypto"))
+              (release (custom-build "build-ssl"))
               (else)))
    ;; Console interface
    (extension ensemble.interface.console
@@ -79,6 +79,6 @@
               ensemble.libs.bindings
               ensemble.interface.console)
             (cond-expand
-              (release (link-options "-L" "-lncursesw"))
+              (release (custom-build "./chicken-ncurses/build"))
               (else)))
    ))
