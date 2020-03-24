@@ -26,7 +26,8 @@ mkdir -p $CHICKEN_INSTALL_REPOSITORY
 
 test -d .git && git submodule update --init
 
-( build_custom_dep bind-egg chicken-ncurses )
+( build_custom_dep bind-egg )
+( build_custom_dep chicken-ncurses )
 build_normal_deps
 
 # Build Ensemble itself (without installing)
