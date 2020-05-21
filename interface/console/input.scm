@@ -361,7 +361,11 @@
       (ipc:leave-room joined)))
 
 (define-command (exit quit) joined args
-  (exit))
+  (ipc:stop)
+  (let lp ()
+    (if (zero? (worker-wait worker #t))
+        (begin (thread-sleep! 0.1) (lp))
+        (exit))))
 
 (define-command (bottom) joined args
   (room-offset-delete! (current-room))
