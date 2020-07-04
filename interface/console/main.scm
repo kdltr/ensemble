@@ -511,7 +511,9 @@
     ((user) (if (eqv? msg 'resize)
                 (set! *resize-channel* (gochan-after 25))
                 (handle-input msg)))
-    ((resize) (resize-terminal))
+    ((resize) ;; TODO remove: simulates old gochan behaviour
+              (set! *resize-channel* (gochan 0))
+              (resize-terminal))
     (else (error "unknown channel sent a message" (list who msg)))))
 
 (define (get-input)
