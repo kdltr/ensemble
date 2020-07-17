@@ -96,7 +96,7 @@
   (info "Done saving state"))
 
 (define +properties-saved+
-  '(notifications highlights read-marker timeline bottom-state))
+  '(notifications highlights read-marker bottom-state))
 
 (define (room-data r)
   (define (extract! sym)
@@ -109,7 +109,18 @@
   (let ((tmp-sym (gensym))
         (plist (symbol-plist r)))
     (set! (symbol-plist tmp-sym) plist)
-    (extract! tmp-sym)))
+    (cons* 'timeline
+           (trim-timeline (get tmp-sym 'timeline))
+           (extract! tmp-sym))))
+
+(define (trim-timeline tl)
+  (let* ((before-checkpoint at-checkpoint (break checkpoint-event? tl))
+         (checkpoint (car at-checkpoint)))
+    (append before-checkpoint
+            ((compose (punch-hole (mref '(content to) checkpoint)
+                                  (mref '(content context) checkpoint))
+                      (punch-checkpoint #f '()))
+             '() '()))))
 
 (define (load-state)
   (ipc-info "Loading profile cache")
@@ -288,11 +299,15 @@
 (define (com.upyum.ensemble.hole-printer evt ctx)
   (sprintf "### Some history excluded..."))
 
+(define (com.upyum.ensemble.checkpoint-printer evt ctx)
+  (sprintf "### Ensemble checkpoint, you should not see this"))
+
 (define event-printers
   `((m.room.message . ,m.room.message-printer)
     (m.room.member . ,m.room.member-printer)
     (m.sticker . ,m.sticker-printer)
-    (com.upyum.ensemble.hole . ,com.upyum.ensemble.hole-printer)))
+    (com.upyum.ensemble.hole . ,com.upyum.ensemble.hole-printer)
+    (com.upyum.ensemble.checkpoint . ,com.upyum.ensemble.checkpoint-printer)))
 
 
 ;; Takes a contextualized event and gives a string representation of it
