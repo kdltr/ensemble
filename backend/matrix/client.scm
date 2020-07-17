@@ -114,11 +114,19 @@
            (extract! tmp-sym))))
 
 (define (trim-timeline tl)
-  (let* ((before-checkpoint at-checkpoint (break checkpoint-event? tl))
-         (checkpoint (car at-checkpoint)))
+  (let* ((before-checkpoint at-checkpoint (break (disjoin hole-event?
+                                                          checkpoint-event?)
+                                                 tl))
+         (hole-or-checkpoint (car at-checkpoint)))
     (append before-checkpoint
-            ((compose (punch-hole (mref '(content to) checkpoint)
-                                  (mref '(content context) checkpoint))
+            ((compose (if (hole-event? hole-or-checkpoint)
+                          (lambda (tl ctx)
+                            (values (timeline-cons hole-or-checkpoint tl)
+                                    ctx))
+                          (punch-hole (mref '(content to)
+                                            hole-or-checkpoint)
+                                      (mref '(content context)
+                                            hole-or-checkpoint)))
                       (punch-checkpoint #f '()))
              '() '()))))
 
