@@ -1,0 +1,21 @@
+#!/bin/sh
+
+set -e
+
+usage() {
+    echo "usage: $0 DESTINATION FILE"
+    echo "       where DESTINATION is the number of the room in the interface,"
+    echo "       or the identifier set with /rename"
+    exit 1
+}
+
+main() {
+    test $# -eq 2 || usage
+    dest="$1"; shift
+    file="$1"; shift
+
+    mime=`file -b --mime-type "$file"`
+    ensemble.backend.matrix default -u "$dest" "$mime" "$file"
+}
+
+main "$@"
