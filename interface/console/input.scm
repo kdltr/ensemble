@@ -289,7 +289,7 @@
     ((_ sym joined args . body) (define-command (sym) joined args . body))))
 
 (define-command (window w r) joined args
-  (switch-window (string->symbol (string-downcase joined))))
+  (switch-window (string->symbol joined)))
 
 (define-command rename joined args
   (let ((target (string->symbol joined)))
