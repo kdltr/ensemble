@@ -2,8 +2,10 @@
 
 set -e
 
+name="`basename $0`"
+
 usage() {
-    echo "usage: $0 DESTINATION FILE"
+    echo "usage: $name DESTINATION FILE"
     echo "       where DESTINATION is the number of the room in the interface,"
     echo "       or the identifier set with /rename"
     exit 1
