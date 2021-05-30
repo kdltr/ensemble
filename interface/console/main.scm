@@ -171,6 +171,15 @@
   (values (or (get win 'highlights) 0)
           (or (get win 'notifications) 0)))
 
+(define (all-windows-notifications)
+  (let lp ((hls 0)
+           (notifs 0)
+           (wins (append *special-windows* *room-windows*)))
+    (if (null? wins)
+        (values hls notifs)
+        (let ((w-hls w-notifs (window-notifications (car wins))))
+          (lp (+ hls w-hls) (+ notifs w-notifs) (cdr wins))))))
+
 (define (add-room-window room-id)
   (define (do-add)
     (let* ((num-id (string->symbol (->string (add1 *free-window-number*))))
@@ -495,6 +504,9 @@
   (wnoutrefresh statuswin)
   (wnoutrefresh inputwin)
   (doupdate)
+  ;; Terminal title
+  (let ((hls notifs (all-windows-notifications)))
+    (printf "\x1B]2;Ensemble -- HLs: ~a Notifs: ~a\x07~!" hls notifs))
   (let ((msg fail meta
          (gochan-select*
            `((,(worker-incomming worker) worker)
