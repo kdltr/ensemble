@@ -73,8 +73,7 @@
         (else
           (error "Usage: backend PROFILE"))))
 
-(define (run-as-backend profile-name . args)
-  (enable-warnings #f) ;; suppress warnings about exceptions in threads
+(define (set-profile! profile-name)
   (set! *profile-dir* (make-pathname (config-home) profile-name))
   (set! *cache-dir* (make-pathname (cache-home) profile-name))
   (create-directory *profile-dir* #t)
@@ -82,7 +81,12 @@
   (set! *state-file* (make-pathname *cache-dir* "state"))
   (set! *lock-fd* (file-open (make-pathname *profile-dir* "lock")
                               (bitwise-ior open/rdwr open/creat)
-                              (bitwise-ior perm/irusr perm/iwusr)))
+                              (bitwise-ior perm/irusr perm/iwusr))))
+
+
+(define (run-as-backend profile-name . args)
+  (enable-warnings #f) ;; suppress warnings about exceptions in threads
+  (set-profile! profile-name)
   (handle-exceptions exn
     (error "This profile is already in use")
     (flock *lock-fd*))
@@ -115,7 +119,7 @@
                            ((video) "m.video")
                            ((image) "m.image")
                            (else "m.file"))))
-      (set! *profile-dir* (make-pathname (config-home) profile-name))
+      (set-profile! profile-name)
       (load-profile)
       (room-send room-id
                  'm.room.message
